@@ -20,5 +20,5 @@ On PC side:
 	- PWM generation: motor now work properly
 	
 # 11.05.19
-	- ...
+	- UART basic functions
 	
