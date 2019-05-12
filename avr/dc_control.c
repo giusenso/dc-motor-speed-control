@@ -11,8 +11,10 @@
 #define TCCRA_MASK	(1<<WGM11)|(1<<COM1A1)|(1<<COM1B1);	//NON Inverted PWM
 #define	TCCRB_MASK	(1<<WGM13)|(1<<WGM12)|(1<<CS10);	  //FAST PWM with NO
 
-#define		CWISE	0x00
-#define		CCWISE	0xFF	
+#define     CWISE		    0xAA
+#define     CCWISE      0xBB
+#define   	OS_FLAG     0x3E  // > opens serial flag
+#define   	CS_FLAG     0x3C  // < close serial flag
 
 //---------------------------------------------------------
 void UART_init(void){
@@ -20,8 +22,8 @@ void UART_init(void){
   UBRR0H = (uint8_t)(MYUBRR>>8);
   UBRR0L = (uint8_t)MYUBRR;
 
-  UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);               /* 8-bit data */ 
-  UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */  
+  UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);               /* 8-bit data */
+  UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */
 }
 
 //---------------------------------------------------------
@@ -87,6 +89,15 @@ void PWM_init(void){
 
 }
 
+//---------------------------------------------------------
+
+void setupTimer(void){
+  // set the prescaler to 1024
+  TCCR5A = 0x00;
+  TCCR5B = (1 << WGM52) | (1 << CS50) | (1 << CS52);
+  TIMSK5 |= (1 << OCIE5A);  // enable the timer interrupt
+}
+
 
 //---------------------------------------------------------
 
@@ -97,7 +108,7 @@ void setPacketRate(uint8_t _packet_per_sec){
 
 //---------------------------------------------------------
 
-void setDirection(uint8_t dir){	
+void setDirection(uint8_t dir){
 	if( dir==CWISE ){
 	  PORTH &= ~(1 << PH6);	//digital pin 9 low
 		PORTH |= (1 << PH5);	//digital pin 8 high
@@ -118,53 +129,83 @@ void setSpeed(uint8_t speed){
 
 volatile uint8_t timer_occurred = 0;
 volatile uint8_t msg_rcv = 0;
-uint8_t timestamp = 0;
-uint8_t speed = 0;
-uint8_t dir = CWISE;
 
+/*=======================================================*/
 /*::::: M A I N :::::::::::::::::::::::::::::::::::::::::*/
-/*    
-*   This is a basic motor test. Motor speed go up and down
-*   and the direction switch every time the motor stop
-*/
+
 int main(void){
+  cli();
 
-  UART_init();	
-  uint8_t buf[4] = { 0,0,0,0 };
-  //wait for handshake packet
-  UART_getString(buf);
-  //echo
-  UART_putString(buf);
-  
   PWM_init();
-  _delay_ms(1000);
-
-  uint8_t speed = 0, dir = CWISE;
-  setSpeed( speed );
+  setSpeed( 0 );
   setDirection( CWISE );
 
-  while (true){
+  setupTimer();
+  OCR5A = F_CPU/1024-1;
 
-    while( speed<255 ){
-      speed++;
-      setSpeed(speed);
-      _delay_ms(30);
+  bool running = false;
+  UART_init();
+
+  uint8_t buf[4]={0xFF,0xFF,0xFF,0};
+
+  //handshake routine -------------------------------------
+  while(!running){
+
+	//[ ?, ?, OS_FLAG, 0]
+    uint8_t hshake[4] = {0xFF, 0xFF, OS_FLAG, 0};
+
+    UART_putString(hshake);
+
+    UART_getString(hshake);
+    if( hshake[0]==OS_FLAG ){
+      buf[0] = 1;
+      buf[1] = hshake[1];
+      buf[2] = hshake[2];
+      setSpeed(buf[1]);
+      setDirection(buf[2]);
+      running=true;
     }
-
-    while( speed>0 ){
-      speed--;
-      setSpeed(speed);
-      _delay_ms(30);
-    }
-
-    if( dir==CWISE ) dir=CCWISE;
-    else if( dir==CCWISE ) dir=CWISE;
-    setDirection( dir );
   }
+  //-------------------------------------------------------
+
+  sei();
+  while( running ){
+
+    if( timer_occurred ){
+      UART_putString((uint8_t*)buf);
+      buf[0]++;
+      timer_occurred = false;
+    }
+
+		if( msg_rcv ){
+		  cli();
+		  UART_getString((uint8_t*)buf);
+      if( buf[0]==CS_FLAG ){
+        running = false;
+      }
+      else{
+        //setPacketRate(buf[0]);
+        setSpeed(buf[1]);
+        setDirection(buf[2]);
+        msg_rcv = false;
+      }
+		  sei();
+    }
+		continue;
+	}
+
+	//exit procedure: send[?, ?, CS_FLAG, 0]
 }
 
+/*=======================================================*/
 /*::: INTERRUPT SERVICE ROUTINES ::::::::::::::::::::::::*/
 
-//...
+ISR(TIMER5_COMPA_vect) {
+  timer_occurred = true;
+}
+
+ISR(USART0_RX_vect) {
+  msg_rcv = true;
+}
 
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
