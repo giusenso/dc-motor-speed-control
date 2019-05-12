@@ -22,3 +22,11 @@ On PC side:
 # 11.05.19
 	- UART basic functions
 	
+# 12.05.19
+	- timer based ISR (send status every 1 second)
+	- UART ISR (reading incoming packet)
+	- Handshaking routine
+	- test new features: works as expected (with cutecom)
+
+# 13.05.19
+	- ...
