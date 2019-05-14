@@ -177,22 +177,22 @@ int main(void){
       timer_occurred = false;
     }
 
-		if( msg_rcv ){
-		  cli();
-		  UART_getString((uint8_t*)buf);
+    if( msg_rcv ){
+      cli();
+      UART_getString((uint8_t*)buf);
       if( buf[0]==CS_FLAG ){
         running = false;
       }
-      else{
-        //setPacketRate(buf[0]);
-        setSpeed(buf[1]);
-        setDirection(buf[2]);
-        msg_rcv = false;
-      }
-		  sei();
+	  }
+    else{
+		  //setPacketRate(buf[0]);
+      setSpeed(buf[1]);
+      setDirection(buf[2]);
+      msg_rcv = false;
     }
-		continue;
+		sei();
 	}
+	continue;
 
 	//exit procedure: send[?, ?, CS_FLAG, 0]
 }
