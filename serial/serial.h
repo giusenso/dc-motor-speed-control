@@ -28,11 +28,34 @@
 
 extern const char* serialPorts[5];
 
+typedef struct packet_t {
+    uint8_t timestamp;
+    uint8_t speed;
+    uint8_t direction;
+}packet_t;
+
+typedef struct listener_params_t{
+    bool*       running_ptr;
+    int         fd;
+    packet_t*   packet_ptr;
+}listener_params_t;
+
 
 //___funcion signature_________________________________
 
 int	 openSerialCommunication(int* fd);
 void setSerialAttributes(int fd);
 void closeSerialCommunication(int* fd);
+
+bool handshake(int fd);
+bool writePacket(int fd, packet_t* packet);
+bool readPacket(int fd, packet_t* packet);
+void printPacket(packet_t packet);
+
+bool decreaseSpeed(packet_t* packet);
+bool increaseSpeed(packet_t* packet);
+bool changeDirection(packet_t* packet);
+bool decreaseRefreshRate(packet_t* packet);
+bool increaseRefreshRate(packet_t* packet);
 
 #endif
