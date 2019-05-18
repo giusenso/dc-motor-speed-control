@@ -62,5 +62,15 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 	- set termios struct parameters
 	- read() and write() syscall
 	- makefile
+
+### 18.05.19
+	- transmission fixes (avr side)
+	- handshake protocol
+	- serial packet_t structure
+	- serial functions (readPacket() and writePacket())
+	- packet_t data manipulation functions
+	- listener thread and mutex synch
+	- main testing: it work (with some bugs)
+
 	
 
