@@ -69,8 +69,11 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 	- serial packet_t structure
 	- serial functions (readPacket() and writePacket())
 	- packet_t data manipulation functions
-	- listener thread and mutex synch
-	- main testing: it work (with some bugs)
-
 	
+### 19.05.19
+	- fixes on avr side
+	- fixes on readPacket() and writePacket()
+	- listener thread for blocking read
+	- mutex synch
+	- main testing: some bugs, but works
 
