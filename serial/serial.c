@@ -1,4 +1,3 @@
-
 #include <unistd.h>
 #include "serial.h"
 
@@ -71,15 +70,14 @@ void setSerialAttributes(int fd){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void closeSerialCommunication(int* fd){
-	 
-	uint8_t buf[4] = { CS_FLAG, 5, CWISE, 10 };
-	tcflush(*fd, TCOFLUSH);
-	if( write(*fd, buf, 4) != 4 ){
-    printf("Error: bytes send should be %lu\n", sizeof(buf));
-		usleep(2000*1000);
-    exit(EXIT_FAILURE);
-  }
 	tcflush(*fd, TCIOFLUSH);
+	 
+	packet_t* tmp = (packet_t*)malloc(sizeof(packet_t));
+	tmp->timestamp = CS_FLAG;
+	tmp->speed = 0;
+	tmp->direction = CWISE;
+	if( !writePacket(*fd, tmp) ) exit(EXIT_FAILURE);
+	free(tmp);
 
 	if( close(*fd) ){
 		printf("Error: close(fd) syscall failed\n");
@@ -90,48 +88,50 @@ void closeSerialCommunication(int* fd){
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-bool handshake(int fd){
-	printf("# Handshake\n");
-	int ret, i = 0;
-	uint8_t buf[4], byte;
-	tcflush(fd, TCIFLUSH);
+bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
+	printf("_____________________________\n\n# Handshake\n");
+	tcflush(fd, TCIOFLUSH);
 
-	//read 4 bytes(1 packet), one by one
-	while(read(fd, &byte, 1)>0){
-		buf[i] = byte;
-		i++;
-		if( i > sizeof(packet_t) ) break;
-	}
-	printf("    PC <---[ %d %d %d ]<--- AVR\n", buf[0],buf[1],buf[2]);
-	printf("    |\n    check...\n    |\n");
-	usleep(400*1000);
-	if( buf[2]!=OS_FLAG ){
+	readPacket(fd, packet_rcv);
+	if( packet_rcv->direction != OS_FLAG){
+		perror("Handshake failed!\n");
 		return false;
 	}
+	printf("    PC <---[ %d %d %d ]<--- AVR\n",
+		packet_rcv->timestamp, packet_rcv->speed, packet_rcv->direction);
 	tcflush(fd, TCIFLUSH);
+	printf("    |\n    check...\n    |\n");
+	usleep(300*1000);
 
-	buf[0] = OS_FLAG;
-	buf[1] = 105;
-	buf[2] = CWISE;
-	if( write(fd, buf, 4) != 4 ) return false;
-	printf("    PC --->[ %d %d %d ]---> AVR\n", buf[0],buf[1],buf[2]);
+	packet_send->timestamp = OS_FLAG;
+	packet_send->speed = 15;
+	packet_send->direction = CWISE;
+	if( !writePacket(fd, packet_send) ) return false;
+
+	printf("    PC --->[ %d %d %d ]---> AVR\n",
+		packet_send->timestamp, packet_send->speed, packet_send->direction);
+	packet_send->timestamp = 1;
 	tcflush(fd, TCOFLUSH);
-	printf("# Done.\n\n");
-	usleep(400*1000);
+	printf("# Done.\n_____________________________\n");
+	usleep(300*1000);
+
 	return true;
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool writePacket(int fd, packet_t* packet){
-	tcflush(fd, TCIFLUSH);
-	int bytes_written = write(fd, (uint8_t*)packet, sizeof(packet_t));
-	if( bytes_written == sizeof(packet_t) ){
+	tcflush(fd, TCOFLUSH);
+	uint8_t buf[4] = { 0,0,0,10 };
+	memcpy(buf, packet, 3);
+	buf[1] += 100;
+
+	if( write(fd, buf, sizeof(buf)) == sizeof(buf) ){
+		//printf("write: [ %d %d %d %d ]\n", buf[0],buf[1],buf[2],buf[3]);
 		return true;
 	}
 	else {
-		printf("Error: %d bytes written, but should be %d\n",
-		bytes_written, (int)sizeof(packet_t));
+		printf("Error: bytes written should be %lu\n",sizeof(buf));
 		return false;
 	}
 }
@@ -140,14 +140,16 @@ bool writePacket(int fd, packet_t* packet){
 
 bool readPacket(int fd, packet_t* packet){
 	tcflush(fd, TCIFLUSH);
-	uint8_t buf[8], byte, i = 0;
-	//read 4 bytes(1 packet), one by one
+	uint8_t buf[4], byte, i = 0;
+
 	while( read(fd, &byte, 1)>0 ){
 		buf[i] = byte;
 		i++;
 		if( i > sizeof(packet_t) ) break;
 	}
+	//printf("read: [ %d %d %d %d ]\n", buf[0],buf[1],buf[2],buf[3]);
 	memcpy(packet, buf, 3);
+	packet->speed -= 100;
 	return true;
 
 }
@@ -155,34 +157,33 @@ bool readPacket(int fd, packet_t* packet){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void printPacket(packet_t packet){
-	char* dir_str = "???";
-	dir_str = packet.direction==CWISE ? "CW" : "CCW";
-	printf("    ________________________________________________\
-					\n\n      timestamp: %d   |  speed: %d  |  direction: %s  \
-					\n    ________________________________________________\n\n",
-          packet.timestamp, packet.speed, dir_str);
+	char* str_dir = "???";
+	if( packet.direction==CWISE ) str_dir = "CW"; 
+	else if( packet.direction==CCWISE ) str_dir = "CCW";
+	printf("\n  [ ts: %d | speed: %d%% | dir: %s ]\n",
+          packet.timestamp, packet.speed, str_dir);
 }
 
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool decreaseSpeed(packet_t* packet){
-	if(packet->speed >= 105){
+	if(packet->speed >= 5){
 		packet->speed -= 5;
 		return true;
 	}
 	else{
-		packet->speed = 100;
+		packet->speed = 0;
 		return false;
 	}
 }
 bool increaseSpeed(packet_t* packet){
-	if(packet->speed <= 195){
+	if(packet->speed <= 95){
 		packet->speed +=5;
 		return true;
 	}
 	else{
-		packet->speed = 200;
+		packet->speed = 100;
 		return false;
 	}
 }
