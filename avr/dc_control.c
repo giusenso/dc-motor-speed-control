@@ -16,6 +16,8 @@
 #define		CCWISE      0xBB
 #define   OS_FLAG     0x3E  // > opens serial flag
 #define   CS_FLAG     0x3C  // < close serial flag
+#define   MIN_SPEED   100
+#define   MAX_SPEED   200
 
 //---------------------------------------------------------
 void UART_init(void){
@@ -78,9 +80,8 @@ void UART_putString(uint8_t* buf){
 //---------------------------------------------------------
 void PWM_init(void){
   /* Timer 3 = digital pin 5 = DDRE */
-
   //Data direction register
-  DDRE |= 0xFF;    //digital pin 5
+  //DDRE |= 0xFF;   //digital pin 5
 
   //Configure TIMER3
   TCCR3A = TCCRA_MASK;
@@ -88,7 +89,14 @@ void PWM_init(void){
 
   //Top timers value
   ICR3 = 39999;
+}
 
+void PWM_start(void){
+  DDRE |= 0xFF; 
+}
+
+void PWM_stop(void){
+  DDRE &= 0x00;
 }
 
 //---------------------------------------------------------
@@ -121,17 +129,15 @@ void setDirection(uint8_t dir){
 }
 
 //---------------------------------------------------------
+
 void setSpeed(uint8_t speed){
-	OCR3A = speed * 149 + 2000;
+	OCR3A = (speed-100) * 369 + 2999;
 }
 
 //---------------------------------------------------------
 /*  global variables  */
-
 volatile uint8_t timer_occurred = false;
 volatile uint8_t msg_rcv = false;
-
-//uint8_t speed, direction, packet_rate;
 
 /*=======================================================*/
 /*::::: M A I N :::::::::::::::::::::::::::::::::::::::::*/
@@ -144,15 +150,12 @@ int main(void){
   setupTimer();
   OCR5A = F_CPU/1024-1;
 
-  setSpeed(1);
-  setDirection(CWISE);
-
   bool running = false;
   UART_init();
 
   uint8_t buf[4];
-  uint8_t _timestamp = 1;
-  uint8_t _speed = 1;
+  uint8_t _timestamp;
+  uint8_t _speed = MIN_SPEED;
   uint8_t _direction = CWISE;
   uint8_t _packet_rate = 1;
 
@@ -160,26 +163,30 @@ int main(void){
 
     // handshake routine ----------------------------------
     while( !running ){
-      uint8_t hshake[3] = { 97, 98, OS_FLAG };
-      UART_putChar(97);
-      UART_putChar(98);
+      UART_putChar(_timestamp);
+      UART_putChar(_speed);
       UART_putChar(OS_FLAG);
       UART_putChar(10);
 
+      uint8_t hshake[3];
       UART_getString(hshake);
       if( hshake[0]==OS_FLAG ){
-        _timestamp = 0;
-        _packet_rate = 1;
+        _packet_rate = hshake[0];
         _speed = hshake[1];
         _direction = hshake[2];
         running = true;
-        break;
+      }
+      else{ 
+        running = false;
+        break;  
       }
     }
-    
+
+    PWM_start();
+    setPacketRate(1);
     setSpeed(_speed);
     setDirection(_direction);
-    _delay_ms(1010);
+    _timestamp = 1;
 
     // MAIN loop ------------------------------------------
     sei();
@@ -190,9 +197,10 @@ int main(void){
         UART_putChar(_speed);
         UART_putChar(_direction);
         UART_putChar(10);
-        _timestamp = _timestamp<=255 ? _timestamp+1 : 1;
+        _timestamp = _timestamp<255 ? _timestamp+1 : 1;
         timer_occurred = false;
       }     
+
       
       if( msg_rcv ){
         UART_getString((uint8_t*)buf);
@@ -205,13 +213,21 @@ int main(void){
           _speed = buf[1];
           _direction = buf[2];
           //setPacketRate(_packet_rate);
-          setSpeed(_speed-100);
+          setSpeed(_speed);
           setDirection(_direction);
         }
         msg_rcv = false;   
       }
+      
     }
-    continue;
+
+    PWM_stop();
+    _timestamp = 1;
+    _packet_rate = 1;
+    //setPacketRate(_packet_rate);
+    _speed = MIN_SPEED;
+    buf[0] = buf[1] = buf[2] = buf[3] = 0;
+    _delay_ms(4000);
   }
 }
 
@@ -227,6 +243,3 @@ ISR(USART0_RX_vect) {
 }
 
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
-
-
-
