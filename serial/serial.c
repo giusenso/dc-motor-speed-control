@@ -210,3 +210,39 @@ bool increaseRefreshRate(packet_t* packet){
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+bool debug_mode(){
+	printf("\n====================================\
+		\n        ### DEBUG MODE ###\
+		\n====================================\n");
+
+	int fd;
+  uint8_t buf_send[4]={OS_FLAG,15,CWISE,0}, buf_rcv[4]={0xFF,0xFF,0xFF,0};
+
+  if( openSerialCommunication(&fd) < 0 ){
+		perror("Failed to open serial communication\n");
+		return false;
+	}	
+  setSerialAttributes(fd);
+
+	packet_t packet_send, packet_rcv;
+	memcpy(&packet_send, buf_send, 3);
+  memcpy(&packet_rcv, buf_rcv, 3);
+
+  if( !handshake(fd, &packet_rcv, &packet_send) ){
+    printf("Handshake failed!\n");
+    return false;
+  }
+
+	writePacket(fd, &packet_send);
+	tcflush(fd, TCIOFLUSH);
+  for(int i=0 ; i<10 ; i++ ){
+    readPacket(fd, &packet_rcv);
+		printPacket(packet_rcv);
+  }
+
+	closeSerialCommunication(&fd);
+	printf("\nNo errors occured. Great job!\
+		\n====================================\n\n");
+  return true;
+}
