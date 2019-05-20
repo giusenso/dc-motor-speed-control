@@ -2,7 +2,7 @@ HEADERS = serial.h
 FLAGS = -Wall -pg 
 
 main: main.o serial.o
-	$(CC) $(FLAGS) -o "$@" main.o serial.o
+	$(CC) $(FLAGS) -o "$@" main.o serial.o -pthread
 
 main.o: main.c $(HEADERS)
 	$(CC) -c main.c serial.c
