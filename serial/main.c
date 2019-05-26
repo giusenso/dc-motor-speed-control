@@ -17,13 +17,14 @@ void* listenerRoutine(void* params){
 	//infinite loop (untill running change) -----------------
 	while(*p->running_ptr){
 		readPacket(p->fd, p->packet_ptr);
-    printPacket(*p->packet_ptr);
+		printPacket(*p->packet_ptr);
 	}
   printf("# Listener thread successfully closed.\n");
 }
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[]){
+  usleep(2000*1000);
   
   int opt;
   while((opt = getopt (argc, argv, "d")) != -1){
@@ -35,7 +36,7 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     } 
   }
-
+	
   int fd = -1, ret;
   bool running = true;
   sem_init(&mutex, 0, 1);
