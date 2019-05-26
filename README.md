@@ -77,3 +77,6 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 	- mutex synch
 	- main testing: some bugs, but works
 
+### 23.05.19
+	-fix bug #2
+	-linear interpolation for smooth speed changes
