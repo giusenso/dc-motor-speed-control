@@ -97,6 +97,8 @@ bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
 		perror("Handshake failed!\n");
 		return false;
 	}
+	packet_rcv->direction = CWISE;
+	usleep(300*1000);
 	printf("    PC <---[ %d %d %d ]<--- AVR\n",
 		packet_rcv->timestamp, packet_rcv->speed, packet_rcv->direction);
 	tcflush(fd, TCIFLUSH);
@@ -104,8 +106,6 @@ bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
 	usleep(300*1000);
 
 	packet_send->timestamp = OS_FLAG;
-	packet_send->speed = 15;
-	packet_send->direction = CWISE;
 	if( !writePacket(fd, packet_send) ) return false;
 
 	printf("    PC --->[ %d %d %d ]---> AVR\n",
@@ -211,38 +211,49 @@ bool increaseRefreshRate(packet_t* packet){
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
+/**
+ * @brief used to test the serial communication.
+ * - open serial communication
+ * - handshake
+ * - set dc motor parameters
+ * - read every 1 second the stats
+ * 
+ * @return true if there is no error
+ * @return false in case of error
+ */
 bool debug_mode(){
 	printf("\n====================================\
 		\n        ### DEBUG MODE ###\
 		\n====================================\n");
 
 	int fd;
-  uint8_t buf_send[4]={OS_FLAG,15,CWISE,0}, buf_rcv[4]={0xFF,0xFF,0xFF,0};
+  	uint8_t buf_send[4]={OS_FLAG,15,CWISE,0},
+	  		buf_rcv[4]={0xFF,0xFF,0xFF,0};
 
-  if( openSerialCommunication(&fd) < 0 ){
+	if( openSerialCommunication(&fd) < 0 ){
 		perror("Failed to open serial communication\n");
 		return false;
 	}	
-  setSerialAttributes(fd);
+  	setSerialAttributes(fd);
 
 	packet_t packet_send, packet_rcv;
 	memcpy(&packet_send, buf_send, 3);
-  memcpy(&packet_rcv, buf_rcv, 3);
+ 	memcpy(&packet_rcv, buf_rcv, 3);
 
-  if( !handshake(fd, &packet_rcv, &packet_send) ){
-    printf("Handshake failed!\n");
-    return false;
-  }
+	if( !handshake(fd, &packet_rcv, &packet_send) ){
+		printf("Handshake failed!\n");
+		return false;
+	}
 
 	writePacket(fd, &packet_send);
 	tcflush(fd, TCIOFLUSH);
-  for(int i=0 ; i<10 ; i++ ){
-    readPacket(fd, &packet_rcv);
+	for(int i=0 ; i<10 ; i++ ){
+		readPacket(fd, &packet_rcv);
 		printPacket(packet_rcv);
-  }
+	}
 
 	closeSerialCommunication(&fd);
 	printf("\nNo errors occured. Great job!\
 		\n====================================\n\n");
-  return true;
+	return true;
 }

@@ -46,16 +46,16 @@ uint8_t UART_getString(uint8_t* buf){
 	while(1){
 		uint8_t c=UART_getChar();
 		*buf=c;
-    	++buf;
-    	// reading a 0 terminates the string
-    	if (c==0) return buf-b0;
-    	// reading a \n  or a \r return results
+		++buf;
+		// reading a 0 terminates the string
+		if (c==0) return buf-b0;
+		// reading a \n  or a \r return results
     	// in forcedly terminating the string
 		if(c=='\n'||c=='\r'){
 			*buf=0;
 			++buf;
 			return buf-b0;
-    	}
+		}
 	}
 }
 
@@ -222,7 +222,7 @@ int main(void){
 				UART_putChar(_speed);
 				UART_putChar(_direction);
 				UART_putChar(10);
-				_timestamp = _timestamp<255 ? _timestamp+1 : 1;
+				_timestamp = _timestamp<255?_timestamp+1:1;
 				timer_occurred = false;
 			}     
 
@@ -266,7 +266,7 @@ int main(void){
 		buf[0] = buf[1] = buf[2] = buf[3] = 0;
 		_delay_ms(3000);
 		
-	}
+	}	//-------------------------------------------------
 }
 
 /*=======================================================*/
