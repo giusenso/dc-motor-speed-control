@@ -18,6 +18,8 @@
 #define   CS_FLAG     0x3C  // < close serial flag
 #define   MIN_SPEED   100
 #define   MAX_SPEED   200
+#define   OCR_TOP_VALUE 39899
+#define   ONE_PERCENT_STEP  OCR_TOP_VALUE/100 //~400
 
 //---------------------------------------------------------
 void UART_init(void){
@@ -81,7 +83,8 @@ void UART_putString(uint8_t* buf){
 void PWM_init(void){
   /* Timer 3 = digital pin 5 = DDRE */
   //Data direction register
-  //DDRE |= 0xFF;   //digital pin 5
+  DDRE |= 0xFF;   //digital pin 5
+  DDRE &= 0x00;   //digital pin 5
 
   //Configure TIMER3
   TCCR3A = TCCRA_MASK;
@@ -117,27 +120,53 @@ void setPacketRate(uint8_t _packet_per_sec){
 
 //---------------------------------------------------------
 
-void setDirection(uint8_t dir){	
+void setDirection(uint8_t dir){
+
 	if( dir==CWISE ){
-	  PORTH &= ~(1 << PH6);	//digital pin 9 low
+    PORTH &= ~(1 << PH6);	//digital pin 9 low
 		PORTH |= (1 << PH5);	//digital pin 8 high
 	}
 	else if( dir==CCWISE ){
 		PORTH &= ~(1 << PH5);	//digital pin 8 low
 		PORTH |= (1 << PH6);	//digital pin 9 high
-	}
+  }
 }
 
 //---------------------------------------------------------
 
 void setSpeed(uint8_t speed){
-	OCR3A = (speed-100) * 369 + 2999;
+	OCR3A = (speed-MIN_SPEED)*ONE_PERCENT_STEP;
+}
+
+/* using linear interpolation */
+void set_speed_smoothly(uint8_t speed){
+  uint16_t delay = 1000;
+  uint8_t num_step = 20;
+  uint8_t delay_per_step = delay/num_step;
+  uint16_t new_ocr = (speed-MIN_SPEED)*ONE_PERCENT_STEP;
+
+  if( new_ocr>OCR3A ){
+    uint16_t step = (new_ocr-OCR3A)/num_step;
+    for(uint8_t i=1 ; i<=num_step ; i++){
+      OCR3A += step;
+      _delay_ms(delay_per_step);
+    } 
+  }
+  else if( new_ocr<OCR3A ){
+    uint16_t step = (OCR3A-new_ocr)/num_step;
+    for(uint8_t i=0 ; i<num_step ; i++){
+      OCR3A -= step;
+      _delay_ms(delay_per_step);
+    } 
+  }
+  setSpeed(speed);
 }
 
 //---------------------------------------------------------
 /*  global variables  */
 volatile uint8_t timer_occurred = false;
 volatile uint8_t msg_rcv = false;
+volatile bool working = false;
 
 /*=======================================================*/
 /*::::: M A I N :::::::::::::::::::::::::::::::::::::::::*/
@@ -154,10 +183,11 @@ int main(void){
   UART_init();
 
   uint8_t buf[4];
-  uint8_t _timestamp;
+  uint8_t _timestamp = 1;
   uint8_t _speed = MIN_SPEED;
   uint8_t _direction = CWISE;
   uint8_t _packet_rate = 1;
+  _delay_ms(500);
 
   while(true){// infinite loop ----------------------------
 
@@ -167,29 +197,27 @@ int main(void){
       UART_putChar(_speed);
       UART_putChar(OS_FLAG);
       UART_putChar(10);
+      _delay_ms(3000);
 
       uint8_t hshake[3];
       UART_getString(hshake);
       if( hshake[0]==OS_FLAG ){
-        _packet_rate = hshake[0];
+        _timestamp = 1;
         _speed = hshake[1];
         _direction = hshake[2];
         running = true;
       }
-      else{ 
-        running = false;
-        break;  
-      }
     }
 
-    PWM_start();
-    setPacketRate(1);
+    _delay_ms(100);
     setSpeed(_speed);
     setDirection(_direction);
-    _timestamp = 1;
+    setPacketRate(1);
+    PWM_start();
 
     // MAIN loop ------------------------------------------
     sei();
+
     while( running ){
 
       if( timer_occurred ){
@@ -201,20 +229,33 @@ int main(void){
         timer_occurred = false;
       }     
 
-      
       if( msg_rcv ){
-        UART_getString((uint8_t*)buf);
+        UART_getString(buf);
+        
         if( buf[0]==CS_FLAG ){
           cli();
           running = false;
         }
         else{
-          _packet_rate = buf[0];
-          _speed = buf[1];
-          _direction = buf[2];
-          //setPacketRate(_packet_rate);
-          setSpeed(_speed);
-          setDirection(_direction);
+
+          if( _packet_rate!=buf[0] ){
+            _packet_rate = buf[0];
+            setPacketRate(_packet_rate);
+          }
+
+          if( _speed!=buf[1]){
+            setSpeed(_speed);
+            _speed = buf[1];
+          }
+          if( _direction != buf[2] ){
+            _direction = buf[2];
+            //cli();
+            //set_speed_smoothly(MIN_SPEED);
+            setDirection(_direction);
+            //set_speed_smoothly(_speed);
+            //sei();
+          }
+
         }
         msg_rcv = false;   
       }
@@ -224,10 +265,11 @@ int main(void){
     PWM_stop();
     _timestamp = 1;
     _packet_rate = 1;
-    //setPacketRate(_packet_rate);
+    setPacketRate(_packet_rate);
     _speed = MIN_SPEED;
+    setSpeed(_speed);
     buf[0] = buf[1] = buf[2] = buf[3] = 0;
-    _delay_ms(4000);
+    _delay_ms(3000);
   }
 }
 
@@ -239,7 +281,7 @@ ISR(TIMER5_COMPA_vect) {
 }
 
 ISR(USART0_RX_vect) {
-  msg_rcv = true;
+  if (!working) msg_rcv = true;
 }
 
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
