@@ -5,7 +5,7 @@
 * [Hardware](#hardware)
 * [Technologies](#technologies)
 * [Features](#features)
-* [development](#development)
+* [Development](#development)
 
 ## The project
 The purpose of this project is to control a DC motor in open loop from a PC. A microcontroller generate a pwm to move the motor. Motor's speed and direction is acquired by serial. PC side there is an easy graphic unit interface to set the parameters.
