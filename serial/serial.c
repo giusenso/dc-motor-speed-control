@@ -73,12 +73,11 @@ void setSerialAttributes(int fd){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void closeSerialCommunication(int* fd){
-	tcflush(*fd, TCIOFLUSH);
 	 
 	packet_t* tmp = (packet_t*)malloc(sizeof(packet_t));
 	tmp->timestamp = CS_FLAG;
-	tmp->speed = 0;
-	tmp->direction = CWISE;
+	tmp->speed = CS_FLAG;
+	tmp->direction = CS_FLAG;
 	if( !writePacket(*fd, tmp) ) exit(EXIT_FAILURE);
 	free(tmp);
 
@@ -144,7 +143,7 @@ bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
 	//------------------------------------------------
 
 	nanosleep(&ts, &ts_rem);
-
+	tcflush(fd, TCIOFLUSH);
 	return true;
 }
 
