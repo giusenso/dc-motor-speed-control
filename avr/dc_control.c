@@ -144,7 +144,7 @@ void set_speed_smoothly(uint8_t speed){
 		for(uint8_t i=1 ; i<=num_step ; i++){
 			OCR3A += step;
 			_delay_ms(delay_per_step);
-		} 
+		}
 	}
 	else if( new_ocr<OCR3A ){
 		uint16_t step = (OCR3A-new_ocr)/num_step;
@@ -178,7 +178,6 @@ volatile uint8_t msg_rcv = false;
 int main(void){
 	cli();
 
-
 	uint8_t buf[4], hshake[4], hs = 0;
 	uint8_t _packet_rate = 1;
 	uint8_t _timestamp = 1;
@@ -187,7 +186,7 @@ int main(void){
 
 	bool running = false;
 	UART_init();
-	_delay_ms(2000);
+	_delay_ms(1000);
 
 	sei();
 	// infinite loop --------------------------------------
@@ -203,11 +202,10 @@ int main(void){
 		while ( !running ){
 			if( msg_rcv && hs==1 ){
 				UART_getString(hshake);
-				_delay_ms(20);
 				if( packetMatch(hshake, OS_FLAG) ){
-					UART_putChar(OS_FLAG);
-					UART_putChar(OS_FLAG+MIN_SPEED);
-					UART_putChar(OS_FLAG);
+					UART_putChar(hshake[0]);
+					UART_putChar(hshake[1]);
+					UART_putChar(hshake[2]);
 					UART_putChar(10);
 					hs++;
 				}
@@ -216,18 +214,17 @@ int main(void){
 
 			if( msg_rcv && hs==2 ){
 				UART_getString(hshake);
-				_delay_ms(20);
 				if( hshake[0]==OS_FLAG ){
 					UART_putChar(hshake[0]);
 					UART_putChar(hshake[1]);
 					UART_putChar(hshake[2]);
 					UART_putChar(10);
 					running = true;
-					hs = 0;
+					//hs = 0;
 				}
 				msg_rcv = false;
 			}
-			_delay_ms(100);
+			continue;
 		}
 		//-------------------------------------------------
 		cli();
@@ -267,21 +264,18 @@ int main(void){
 				}		
 				else{
 					if( _packet_rate!=buf[0] ){
-					_packet_rate = buf[0];
-					setPacketRate(_packet_rate);
+						_packet_rate = buf[0];
+						setPacketRate(_packet_rate);
 					}
-
 					if( _speed!=buf[1]){
-						setSpeed(_speed);
 						_speed = buf[1];
+						setSpeed(_speed);
 					}
 					if( _direction != buf[2] ){
 						_direction = buf[2];
-						//cli();
-						//set_speed_smoothly(MIN_SPEED);
+						set_speed_smoothly(MIN_SPEED);
 						setDirection(_direction);
-						//set_speed_smoothly(_speed);
-						//sei();
+						set_speed_smoothly(_speed);
 					}
 				}
 				msg_rcv = false;   

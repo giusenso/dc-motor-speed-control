@@ -5,7 +5,6 @@
 #include "gui.h"
 #include <getopt.h>
 
-
 sem_t mutex;
 
 char  speed_str[64], dir_str[64],
@@ -75,7 +74,7 @@ int main(int argc, char* argv[]){
   bool running = true;
   sem_init(&mutex, 0, 1);
 
-  uint8_t buf_send[4]={OS_FLAG,25,CWISE,0}, buf_rcv[4]={0xFF,0xFF,0xFF,0};
+  uint8_t buf_send[4]={OS_FLAG,35,CWISE,0}, buf_rcv[4]={0xFF,0xFF,0xFF,0};
   packet_t packet_send, packet_rcv;
   memcpy(&packet_send, buf_send, 3);
   memcpy(&packet_rcv, buf_rcv, 3);
