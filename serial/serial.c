@@ -8,6 +8,9 @@ const char* serialPorts[5]= {	ttyACM0,
 								ttyACM4
 							};
 
+packet_t open_packet = { OS_FLAG, OS_FLAG, OS_FLAG};
+packet_t close_packet = { CS_FLAG, CS_FLAG, CS_FLAG};
+
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 int openSerialCommunication(int* fd){
@@ -89,31 +92,58 @@ void closeSerialCommunication(int* fd){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
-	printf("_____________________________\n\n# Handshake\n");
-	tcflush(fd, TCIOFLUSH);
+	struct timespec ts = {0,500*1000000}, ts_rem;
 
-	readPacket(fd, packet_rcv);
-	if( packet_rcv->direction != OS_FLAG){
-		perror("Handshake failed!\n");
+	if( !readPacket(fd, packet_rcv) ) return false;
+	printf("    AVR >>>>>");
+	printPacketV2(*packet_rcv);
+	printf(">>>>> PC\n    |\n    check... ");
+	if ( !packetcmp(packet_rcv, &open_packet) ) {
+		printf("error! packet not match with open_packet\n");
 		return false;
 	}
-	packet_rcv->direction = CWISE;
-	usleep(300*1000);
-	printf("    PC <---[ %d %d %d ]<--- AVR\n",
-		packet_rcv->timestamp, packet_rcv->speed, packet_rcv->direction);
-	tcflush(fd, TCIFLUSH);
-	printf("    |\n    check...\n    |\n");
-	usleep(300*1000);
+	else printf(" no errors.\n");
+	nanosleep(&ts, &ts_rem); 	
 
+	if( !writePacket(fd, &open_packet) ) return false;
+	printf("    AVR <<<<<");
+	printPacketV2(open_packet);
+	printf("<<<<< PC\n    |");
+
+	if( !readPacket(fd, packet_rcv) ) return false;
+	printf("    AVR >>>>>");
+	printPacketV2(*packet_rcv);
+	printf(">>>>> PC\n    |\n    check... ");
+	if ( !packetcmp(packet_rcv, &open_packet) ) {
+		printf("error! packet not match with open_packet\n");
+		return false;
+	}
+	else printf(" no errors.\n");
+	nanosleep(&ts, &ts_rem);
+
+	//------------------------------------------------
+	//write starting configuration
+	uint8_t _timestamp = packet_send->timestamp;
 	packet_send->timestamp = OS_FLAG;
 	if( !writePacket(fd, packet_send) ) return false;
+	printf("    AVR <<<<<");
+	printPacketV2(*packet_send);
+	printf("<<<<< PC\n    |");
 
-	printf("    PC --->[ %d %d %d ]---> AVR\n",
-		packet_send->timestamp, packet_send->speed, packet_send->direction);
-	packet_send->timestamp = 1;
-	tcflush(fd, TCOFLUSH);
-	printf("# Done.\n_____________________________\n");
-	usleep(300*1000);
+	if( !readPacket(fd, packet_rcv) ) return false;
+	printf("    AVR >>>>>");
+	printPacketV2(*packet_rcv);
+	printf(">>>>> PC\n    |\n    check... ");
+	if ( !packetcmp(packet_rcv, packet_send) ) {
+		printf("error! packet not match with packet_send.\n");
+		return false;
+	}
+	else printf(" no errors.\n");
+
+	packet_send->timestamp = _timestamp;
+	//------------------------------------------------
+
+	nanosleep(&ts, &ts_rem);
 
 	return true;
 }
@@ -134,6 +164,7 @@ bool writePacket(int fd, packet_t* packet){
 		printf("Error: bytes written should be %lu\n",sizeof(buf));
 		return false;
 	}
+	
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -154,6 +185,13 @@ bool readPacket(int fd, packet_t* packet){
 
 }
 
+bool packetcmp(packet_t* p1, packet_t* p2){
+	if( p1->timestamp != p2->timestamp ) return false;
+	if( p1->speed != p2->speed ) 		 return false;
+	if( p1->direction != p2->direction ) return false;
+	else return true;
+}
+
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void printPacket(packet_t packet){
@@ -162,6 +200,9 @@ void printPacket(packet_t packet){
 	else if( packet.direction==CCWISE ) str_dir = "CCW";
 	printf("\n  [ ts: %d | speed: %d%% | dir: %s ]\n",
           packet.timestamp, packet.speed, str_dir);
+}
+void printPacketV2(packet_t packet){
+	printf("[ %d %d %d ]", packet.timestamp, packet.speed, packet.direction);
 }
 
 
