@@ -10,16 +10,16 @@
 #define MYUBRR (F_CPU/16/BAUD-1)
 
 #define TCCRA_MASK	(1<<WGM11)|(1<<COM1A1)|(1<<COM1B1);	//NON Inverted PWM
-#define	TCCRB_MASK	(1<<WGM13)|(1<<WGM12)|(1<<CS10);	  //FAST PWM with NO
+#define	TCCRB_MASK	(1<<WGM13)|(1<<WGM12)|(1<<CS10);	//FAST PWM with NO
 
-#define		CWISE	     	0xAA
-#define		CCWISE      	0xBB
-#define   	OS_FLAG     	0x3E  // > opens serial flag
-#define   	CS_FLAG     	0x3C  // < close serial flag
-#define   	MIN_SPEED   	100
-#define   	MAX_SPEED		200
-#define   	OCR_TOP_VALUE	39899
-#define   	ONE_PERCENT_STEP  OCR_TOP_VALUE/100 //~400
+#define		CWISE	     		0xAA
+#define		CCWISE      		0xBB
+#define   	OS_FLAG     		'>'		// open serial flag
+#define   	CS_FLAG     		'<'		// close serial flag
+#define   	MIN_SPEED   		100
+#define   	MAX_SPEED			200
+#define   	OCR_TOP_VALUE		39899
+#define   	ONE_PERCENT_STEP  	OCR_TOP_VALUE/100 //~400
 
 //---------------------------------------------------------
 void UART_init(void){
@@ -28,7 +28,6 @@ void UART_init(void){
 	UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);               /* 8-bit data */ 
 	UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */  
 }
-
 //---------------------------------------------------------
 uint8_t UART_getChar(void){
 	// Wait for incoming data, looping on status bit
@@ -37,22 +36,19 @@ uint8_t UART_getChar(void){
 	// Return the data
 	return UDR0;
 }
-
 //----------------------------------------------------------
-// reads a string until the first newline or 0
-// returns the size read
 uint8_t UART_getString(uint8_t* buf){
-	uint8_t* b0=buf; //beginning of buffer
+	uint8_t* b0 = buf; //beginning of buffer
 	while(1){
-		uint8_t c=UART_getChar();
-		*buf=c;
+		uint8_t c = UART_getChar();
+		*buf = c;
 		++buf;
 		// reading a 0 terminates the string
-		if (c==0) return buf-b0;
+		if( c==0 ) return buf-b0;
 		// reading a \n  or a \r return results
     	// in forcedly terminating the string
-		if(c=='\n'||c=='\r'){
-			*buf=0;
+		if( c=='\n'||c=='\r' ){
+			*buf = 0;
 			++buf;
 			return buf-b0;
 		}
@@ -67,16 +63,16 @@ void UART_putChar(uint8_t c){
 	// Start transmission
 	UDR0 = c;
 }
-
 //---------------------------------------------------------
+
 void UART_putString(uint8_t* buf){
 	while(*buf){
 		UART_putChar(*buf);
 		++buf;
 	}
 }
+//--------------------------------------------------------
 
-//---------------------------------------------------------
 void PWM_init(void){
 	/* Timer 3 = digital pin 5 = DDRE */
   	//Data direction register
@@ -106,6 +102,7 @@ void setupTimer(void){
 	TCCR5A = 0x00;
 	TCCR5B = (1 << WGM52) | (1 << CS50) | (1 << CS52);
 	TIMSK5 |= (1 << OCIE5A);  // enable the timer interrupt
+	OCR5A = F_CPU/1024-1;
 }
 
 //---------------------------------------------------------
@@ -160,10 +157,20 @@ void set_speed_smoothly(uint8_t speed){
 }
 
 //---------------------------------------------------------
+
+bool packetMatch(uint8_t* p, uint8_t c){
+	if( p[0]==c && p[1]-100==c )
+		return true;
+	else return false;
+}
+
+//---------------------------------------------------------
+
+
+//---------------------------------------------------------
 /*  global variables  */
 volatile uint8_t timer_occurred = false;
 volatile uint8_t msg_rcv = false;
-volatile bool working = false;
 
 /*=======================================================*/
 /*::::: M A I N :::::::::::::::::::::::::::::::::::::::::*/
@@ -171,49 +178,77 @@ volatile bool working = false;
 int main(void){
 	cli();
 
-	PWM_init();
 
-	setupTimer();
-	OCR5A = F_CPU/1024-1;
-
-	bool running = false;
-	UART_init();
-
-	uint8_t buf[4];
+	uint8_t buf[4], hshake[4], hs = 0;
+	uint8_t _packet_rate = 1;
 	uint8_t _timestamp = 1;
 	uint8_t _speed = MIN_SPEED;
 	uint8_t _direction = CWISE;
-	uint8_t _packet_rate = 1;
+
+	bool running = false;
+	UART_init();
 	_delay_ms(500);
 
-	while(true){// infinite loop ----------------------------
-
-		// handshake routine ----------------------------------
-		while( !running ){
-			UART_putChar(_timestamp);
-			UART_putChar(_speed);
-			UART_putChar(OS_FLAG);
-			UART_putChar(10);
-			_delay_ms(3000);
-
-			uint8_t hshake[3];
-			UART_getString(hshake);
-			if( hshake[0]==OS_FLAG ){
-				_timestamp = 1;
-				_speed = hshake[1];
-				_direction = hshake[2];
-				running = true;
+	// infinite loop --------------------------
+	while(true){
+		// handshake routine ------------------------------
+		hs = 0;
+		UART_putChar(OS_FLAG);
+		UART_putChar(OS_FLAG+MIN_SPEED);
+		UART_putChar(OS_FLAG);
+		UART_putChar(10);
+		hs = 1;
+	
+		sei();
+		while ( !running ){
+			if( msg_rcv && hs==1 ){
+				UART_getString(hshake);
+				_delay_ms(20);
+				if( packetMatch(hshake, OS_FLAG) ){
+					UART_putChar(OS_FLAG);
+					UART_putChar(OS_FLAG+MIN_SPEED);
+					UART_putChar(OS_FLAG);
+					UART_putChar(10);
+					msg_rcv = false;
+					hs = 2;
+				}
 			}
+			if( msg_rcv && hs==2 ){
+				UART_getString(hshake);
+				_delay_ms(20);
+				if( hshake[0]==OS_FLAG ){
+					_timestamp = hshake[0];
+					_speed = hshake[1];
+					_direction = hshake[2];
+					UART_putChar(_timestamp);
+					UART_putChar(_speed);
+					UART_putChar(_direction);
+					UART_putChar(10);
+					running = true;
+					msg_rcv = false;
+				}
+			}
+			_delay_ms(100);
+			continue;
 		}
+		//-------------------------------------------------
+		cli();
 
-		_delay_ms(100);
+		// timer used as interrupt trigger
+		setupTimer();
+		
+		// pwm to control motor speed 
+		PWM_init();
+
+		// set starting parameters
 		setSpeed(_speed);
 		setDirection(_direction);
 		setPacketRate(1);
 		PWM_start();
 
-		// MAIN loop ------------------------------------------
 		sei();
+		
+		// MAIN loop ------------------------------------------
 
 		while( running ){
 
@@ -227,13 +262,11 @@ int main(void){
 			}     
 
 			if( msg_rcv ){
-				UART_getString(buf);
-				
+				UART_getString(buf);				
 				if( buf[0]==CS_FLAG ){
 					cli();
 					running = false;
-				}
-		
+				}		
 				else{
 					if( _packet_rate!=buf[0] ){
 					_packet_rate = buf[0];
@@ -253,7 +286,7 @@ int main(void){
 						//sei();
 					}
 				}
-			msg_rcv = false;   
+				msg_rcv = false;   
 			}
 		}
 
@@ -277,7 +310,7 @@ ISR(TIMER5_COMPA_vect) {
 }
 
 ISR(USART0_RX_vect) {
-	if (!working) msg_rcv = true;
+	msg_rcv = true;
 }
 
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
