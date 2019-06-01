@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <math.h>
 #include <errno.h>
 #include <string.h>
 #include <time.h>
@@ -16,10 +15,11 @@
 #define BAUD_RATE 19200
 #define MYUBRR (F_CPU/16/BAUD_RATE-1)
 
-#define		CWISE     0xAA
-#define		CCWISE    0xBB
-#define     OS_FLAG   '>'      // open serial flag
-#define     CS_FLAG   '<'      // close serial flag
+#define		CWISE       0xAA
+#define		CCWISE      0xBB
+#define     OS_FLAG     '>'      // open serial flag
+#define     CS_FLAG     '<'      // close serial flag
+#define     MIN_SPEED   100
 
 #define     ttyACM0     "/dev/ttyACM0"
 #define     ttyACM1     "/dev/ttyACM1"
@@ -33,7 +33,6 @@ typedef struct packet_t {
     uint8_t speed;
     uint8_t direction;
 }packet_t;
-extern packet_t open_packet, close_packet;
 
 typedef struct listener_params_t{
     bool*       running_ptr;

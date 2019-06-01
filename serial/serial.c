@@ -8,9 +8,6 @@ const char* serialPorts[5]= {	ttyACM0,
 								ttyACM4
 							};
 
-packet_t open_packet = { OS_FLAG, OS_FLAG, OS_FLAG};
-packet_t close_packet = { CS_FLAG, CS_FLAG, CS_FLAG};
-
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 int openSerialCommunication(int* fd){
@@ -91,57 +88,60 @@ void closeSerialCommunication(int* fd){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
-	struct timespec ts = {0,500*1000000}, ts_rem;
-
+	struct timespec ts = {0,300*1000000}, ts_rem;
+	printf("# Handshake\n====================================\n\n");
+	
+	packet_t open_packet = { OS_FLAG, OS_FLAG, OS_FLAG };
 	if( !readPacket(fd, packet_rcv) ) return false;
-	printf("    AVR >>>>>");
+	printf("    PC <<<<< ");
 	printPacketV2(*packet_rcv);
-	printf(">>>>> PC\n    |\n    check... ");
+	printf(" <<<<< AVR\n    |\n    check... ");
 	if ( !packetcmp(packet_rcv, &open_packet) ) {
 		printf("error! packet not match with open_packet\n");
 		return false;
 	}
-	else printf(" no errors.\n");
-	nanosleep(&ts, &ts_rem); 	
+	else printf(" no errors.\n    |\n");
+	nanosleep(&ts, &ts_rem);
 
-	if( !writePacket(fd, &open_packet) ) return false;
-	printf("    AVR <<<<<");
+	//------------------------------------------------
+	if( !writePacket(fd,&open_packet) ) return false;
+	printf("    PC >>>>> ");
 	printPacketV2(open_packet);
-	printf("<<<<< PC\n    |");
+	printf(" >>>>> AVR\n");
 
 	if( !readPacket(fd, packet_rcv) ) return false;
-	printf("    AVR >>>>>");
+	printf("    PC <<<<< ");
 	printPacketV2(*packet_rcv);
-	printf(">>>>> PC\n    |\n    check... ");
+	printf(" <<<<< AVR\n    |\n    check... ");
 	if ( !packetcmp(packet_rcv, &open_packet) ) {
 		printf("error! packet not match with open_packet\n");
 		return false;
 	}
-	else printf(" no errors.\n");
+	else printf(" no errors.\n    |\n");
 	nanosleep(&ts, &ts_rem);
 
 	//------------------------------------------------
 	//write starting configuration
-	uint8_t _timestamp = packet_send->timestamp;
 	packet_send->timestamp = OS_FLAG;
+
 	if( !writePacket(fd, packet_send) ) return false;
-	printf("    AVR <<<<<");
+	printf("    PC >>>>> ");
 	printPacketV2(*packet_send);
-	printf("<<<<< PC\n    |");
+	printf(" >>>>> AVR\n");
 
 	if( !readPacket(fd, packet_rcv) ) return false;
-	printf("    AVR >>>>>");
+	printf("    PC <<<<< ");
 	printPacketV2(*packet_rcv);
-	printf(">>>>> PC\n    |\n    check... ");
+	printf(" <<<<< AVR\n    |\n    check... ");
 	if ( !packetcmp(packet_rcv, packet_send) ) {
 		printf("error! packet not match with packet_send.\n");
 		return false;
 	}
-	else printf(" no errors.\n");
+	else printf(" no errors.\n    |\n");
+	packet_send->timestamp = 1;
 
-	packet_send->timestamp = _timestamp;
 	//------------------------------------------------
-
+	printf("\n====================================\n");
 	nanosleep(&ts, &ts_rem);
 	tcflush(fd, TCIOFLUSH);
 	return true;
@@ -200,10 +200,10 @@ void printPacket(packet_t packet){
 	printf("\n  [ ts: %d | speed: %d%% | dir: %s ]\n",
           packet.timestamp, packet.speed, str_dir);
 }
+
 void printPacketV2(packet_t packet){
 	printf("[ %d %d %d ]", packet.timestamp, packet.speed, packet.direction);
 }
-
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
@@ -217,6 +217,7 @@ bool decreaseSpeed(packet_t* packet){
 		return false;
 	}
 }
+
 bool increaseSpeed(packet_t* packet){
 	if(packet->speed <= 95){
 		packet->speed +=5;
@@ -241,6 +242,7 @@ bool decreaseRefreshRate(packet_t* packet){
 	}
 	else return false;
 }
+
 bool increaseRefreshRate(packet_t* packet){
 	if(packet->timestamp < 5){
 		packet->timestamp++;
