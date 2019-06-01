@@ -17,8 +17,8 @@
 
 #define		CWISE       0xAA
 #define		CCWISE      0xBB
-#define     OS_FLAG     '>'      // open serial flag
-#define     CS_FLAG     '<'      // close serial flag
+#define     OS_FLAG     0x70      // open serial flag
+#define     CS_FLAG     0x80      // close serial flag
 #define     MIN_SPEED   100
 
 #define     ttyACM0     "/dev/ttyACM0"

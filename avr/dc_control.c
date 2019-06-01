@@ -14,8 +14,8 @@
 
 #define		CWISE	     		0xAA
 #define		CCWISE      		0xBB
-#define   	OS_FLAG     		'>'		// open serial flag
-#define   	CS_FLAG     		'<'		// close serial flag
+#define   	OS_FLAG     		0x70		// open serial flag
+#define   	CS_FLAG     		0x80		// close serial flag
 #define   	MIN_SPEED   		100
 #define   	MAX_SPEED			200
 #define   	OCR_TOP_VALUE		39899
@@ -47,7 +47,7 @@ uint8_t UART_getString(uint8_t* buf){
 		if( c==0 ) return buf-b0;
 		// reading a \n  or a \r return results
     	// in forcedly terminating the string
-		if( c=='\n'||c=='\r' ){
+		if( c=='\n' || c=='\r' ){
 			*buf = 0;
 			++buf;
 			return buf-b0;
@@ -187,19 +187,19 @@ int main(void){
 
 	bool running = false;
 	UART_init();
-	_delay_ms(500);
+	_delay_ms(2000);
 
-	// infinite loop --------------------------
+	sei();
+	// infinite loop --------------------------------------
 	while(true){
 		// handshake routine ------------------------------
-		hs = 0;
-		UART_putChar(OS_FLAG);
-		UART_putChar(OS_FLAG+MIN_SPEED);
-		UART_putChar(OS_FLAG);
-		UART_putChar(10);
-		hs = 1;
-	
-		sei();
+		if( hs==0 ){
+			UART_putChar(OS_FLAG);
+			UART_putChar(OS_FLAG+MIN_SPEED);
+			UART_putChar(OS_FLAG);
+			UART_putChar(10);
+			hs++;
+		}
 		while ( !running ){
 			if( msg_rcv && hs==1 ){
 				UART_getString(hshake);
@@ -209,27 +209,25 @@ int main(void){
 					UART_putChar(OS_FLAG+MIN_SPEED);
 					UART_putChar(OS_FLAG);
 					UART_putChar(10);
-					msg_rcv = false;
-					hs = 2;
+					hs++;
 				}
+				msg_rcv = false;
 			}
+
 			if( msg_rcv && hs==2 ){
 				UART_getString(hshake);
 				_delay_ms(20);
 				if( hshake[0]==OS_FLAG ){
-					_timestamp = hshake[0];
-					_speed = hshake[1];
-					_direction = hshake[2];
-					UART_putChar(_timestamp);
-					UART_putChar(_speed);
-					UART_putChar(_direction);
+					UART_putChar(hshake[0]);
+					UART_putChar(hshake[1]);
+					UART_putChar(hshake[2]);
 					UART_putChar(10);
 					running = true;
-					msg_rcv = false;
+					hs = 0;
 				}
+				msg_rcv = false;
 			}
 			_delay_ms(100);
-			continue;
 		}
 		//-------------------------------------------------
 		cli();

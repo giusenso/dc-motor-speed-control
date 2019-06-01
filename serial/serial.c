@@ -88,7 +88,7 @@ void closeSerialCommunication(int* fd){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
-	struct timespec ts = {0,300*1000000}, ts_rem;
+	struct timespec ts = {0,500*1000000}, ts_rem;
 	printf("# Handshake\n====================================\n\n");
 	
 	packet_t open_packet = { OS_FLAG, OS_FLAG, OS_FLAG };
@@ -101,6 +101,7 @@ bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
 		return false;
 	}
 	else printf(" no errors.\n    |\n");
+	tcflush(fd, TCIOFLUSH);
 	nanosleep(&ts, &ts_rem);
 
 	//------------------------------------------------
@@ -118,12 +119,13 @@ bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
 		return false;
 	}
 	else printf(" no errors.\n    |\n");
+	tcflush(fd, TCIOFLUSH);
 	nanosleep(&ts, &ts_rem);
 
 	//------------------------------------------------
 	//write starting configuration
 	packet_send->timestamp = OS_FLAG;
-
+	tcflush(fd, TCIOFLUSH);
 	if( !writePacket(fd, packet_send) ) return false;
 	printf("    PC >>>>> ");
 	printPacketV2(*packet_send);

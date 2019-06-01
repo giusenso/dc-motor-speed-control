@@ -76,7 +76,6 @@ int main(int argc, char* argv[]){
   sem_init(&mutex, 0, 1);
 
   uint8_t buf_send[4]={OS_FLAG,25,CWISE,0}, buf_rcv[4]={0xFF,0xFF,0xFF,0};
-
   packet_t packet_send, packet_rcv;
   memcpy(&packet_send, buf_send, 3);
   memcpy(&packet_rcv, buf_rcv, 3);
@@ -87,7 +86,7 @@ int main(int argc, char* argv[]){
 
   //Handshake routine, if fail crash;
   if( !handshake(fd, &packet_rcv, &packet_send) ){
-    perror("Handshake failed! exit...");
+    printf("Handshake failed! exit...");
     exit(EXIT_FAILURE);
   }
 
@@ -107,7 +106,7 @@ int main(int argc, char* argv[]){
                         listenerRoutine,
                         (void*)&params);                        
   if( ret != 0 ){
-    perror("Error: cannot create listener thread!\n");
+    printf("Error: cannot create listener thread!\n");
     exit(EXIT_FAILURE);
   }
   else printf("# Listener thread successfully created.\n");
