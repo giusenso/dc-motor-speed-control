@@ -10,7 +10,7 @@
 #define		MENU_XPOS			5
 #define		MENU_YPOS		    4
 #define     MENU_BOX_WIDTH      50
-#define     LISTENER_BOX_WIDTH  32
+#define     LISTENER_BOX_WIDTH  34
 
 extern char* choices[NUM_CHOICES];
 extern char* welcome_msg;
