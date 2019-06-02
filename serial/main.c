@@ -6,10 +6,9 @@
 #include <getopt.h>
 
 sem_t mutex;
-
+struct timespec ts, ts_rem;
 char  speed_str[64], dir_str[64],
       refresh_str[64], sendedr_win_str[256];
-struct timespec ts, ts_rem;
 
 ///////////////////////////////////////////////////////////////////////////////
 void* listenerRoutine(void* params){
@@ -18,7 +17,7 @@ void* listenerRoutine(void* params){
   listener_params_t* p = params;
 
   sem_wait(&mutex);
-  WINDOW* listener_win = newwin(7, LISTENER_BOX_WIDTH, MENU_YPOS+10, MENU_XPOS+9);
+  WINDOW* listener_win = newwin(7, LISTENER_BOX_WIDTH, MENU_YPOS+10, MENU_XPOS+8);
   box(listener_win, 0, 0);
   mvwprintw(listener_win, 0, 7, " RECEIVED PACKETS ");
   mvwprintw(listener_win, 2, 3, "timestamp: ");
@@ -37,7 +36,8 @@ void* listenerRoutine(void* params){
     mvwprintw(listener_win, 3, 3, "speed: %s", str);
       
     mvwprintw(listener_win, 4, 3, "direction: %s", 
-      p->packet_ptr->direction==CCWISE ? "counterclockwis ":"clockwise       ");
+      p->packet_ptr->direction==CCWISE ?
+      "counterclockwise ":"clockwise       ");
 		wrefresh(listener_win);
 	}
 
@@ -47,34 +47,43 @@ void* listenerRoutine(void* params){
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[]){
-  ts.tv_sec = 2;
-  nanosleep(&ts, &ts_rem);
-  ts.tv_sec = 0;
-  ts.tv_nsec = 33*1000000;
+  bool smooth = false;
 
+  //flag handler-------------------------------------------
   int opt;
-  while((opt = getopt (argc, argv, "d")) != -1){
+  while((opt = getopt (argc, argv, "fds")) != -1){
     switch (opt){
+
+      case 'f':
+        printf("# Forcing AVR reboot... \n");
+        system("cd ../avr && bash upload.sh");
+        break;
+
       case 'd':
         debug_mode();
-        exit(0);
-        break;  
-      /*
+        exit(EXIT_SUCCESS);
+        break; 
+
       case 's':
-        //enable linear interpolation... 
+        smooth = true;
         break;
-      */
+
       case '?':
         exit(EXIT_FAILURE);
     } 
   }
+  //-------------------------------------------------------
+
+  ts.tv_sec = 0;
+  ts.tv_nsec = 500*1000000;
 
   int choice, highlight = 0;
   int fd = -1, ret;
   bool running = true;
   sem_init(&mutex, 0, 1);
 
-  uint8_t buf_send[4]={OS_FLAG,35,CWISE,0}, buf_rcv[4]={0xFF,0xFF,0xFF,0};
+  uint8_t buf_send[4] = { 1,25,CWISE,10 },
+          buf_rcv[4] = { 0xFF,0xFF,0xFF,10 };
   packet_t packet_send, packet_rcv;
   memcpy(&packet_send, buf_send, 3);
   memcpy(&packet_rcv, buf_rcv, 3);
@@ -83,9 +92,12 @@ int main(int argc, char* argv[]){
   openSerialCommunication(&fd);
   setSerialAttributes(fd);
 
-  //Handshake routine, if fail crash;
-  if( !handshake(fd, &packet_rcv, &packet_send) ){
-    printf("Handshake failed! exit...");
+  if( smooth ) printf("\n# Linear interpolation: ON\n");
+
+  //Handshake routine, if fail exit
+  if( !handshake(fd, &packet_rcv, smooth) ){
+    printf("Handshake failed! exit... \n");
+    tcflush(fd, TCOFLUSH);
     exit(EXIT_FAILURE);
   }
 
@@ -112,7 +124,8 @@ int main(int argc, char* argv[]){
 
   //create GUI ------------------------------------------
   WINDOW *menu_win, *sender_win;
-  printf("# initializing GUI...\n");
+  printf("# Initializing GUI...\n");
+  nanosleep(&ts, &ts_rem);
 	initGUI();
   printWelcomeMessage(welcome_msg);
 
@@ -134,6 +147,7 @@ int main(int argc, char* argv[]){
   wrefresh(sender_win);
   clear();
 
+  ts.tv_nsec = 33*1000000;
   bool something_change = true;
   running = true;
   sem_post(&mutex); //end critical section
@@ -221,7 +235,7 @@ int main(int argc, char* argv[]){
   sem_destroy(&mutex);
   closeSerialCommunication(&fd);
   endwin();
-  printf("# Serial communication closed...\n# exit...\n");
+  printf("# Serial communication closed. Exit...\n");
   nanosleep(&ts, &ts_rem);
   
   return 0;
