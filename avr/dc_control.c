@@ -14,8 +14,8 @@
 
 #define		CWISE	     		0xAA
 #define		CCWISE      		0xBB
-#define   	OS_FLAG     		0x70		// open serial flag
-#define   	CS_FLAG     		0x80		// close serial flag
+#define   	OS_FLAG     		'>'		// open serial flag
+#define   	CS_FLAG     		'<'		// close serial flag
 #define   	MIN_SPEED   		100
 #define   	MAX_SPEED			200
 #define   	OCR_TOP_VALUE		39899
@@ -159,8 +159,7 @@ void set_speed_smoothly(uint8_t speed){
 //---------------------------------------------------------
 
 bool packetMatch(uint8_t* p, uint8_t c){
-	if( p[0]==c && p[1]-100==c )
-		return true;
+	if( p[0]==c && p[1]-100==c && p[2]==c)return true;
 	else return false;
 }
 
@@ -178,7 +177,7 @@ volatile uint8_t msg_rcv = false;
 int main(void){
 	cli();
 
-	uint8_t buf[4], hshake[4], hs = 0;
+	uint8_t buf[4], hs = 0;
 	uint8_t _packet_rate = 1;
 	uint8_t _timestamp = 1;
 	uint8_t _speed = MIN_SPEED;
@@ -187,47 +186,46 @@ int main(void){
 	bool running = false;
 	UART_init();
 	_delay_ms(1000);
-
-	sei();
-	// infinite loop --------------------------------------
-	while(true){
-		// handshake routine ------------------------------
-		if( hs==0 ){
-			UART_putChar(OS_FLAG);
-			UART_putChar(OS_FLAG+MIN_SPEED);
-			UART_putChar(OS_FLAG);
-			UART_putChar(10);
-			hs++;
+	
+	// handshake routine ----------------------------------
+	uint8_t hshake[4] = {OS_FLAG,OS_FLAG+101,OS_FLAG+2,10};
+	if( hs==0 ){
+		
+		UART_putChar(hshake[0]);
+		UART_putChar(hshake[1]);
+		UART_putChar(hshake[2]);
+		UART_putChar(hshake[3]);
+		hs = 1;
+		sei();
+	}
+	while ( !running ){
+		if( msg_rcv && hs==1 ){
+			cli();
+			UART_getString(hshake);
+			UART_putChar(hshake[0]);
+			UART_putChar(hshake[1]);
+			UART_putChar(hshake[2]);
+			UART_putChar(hshake[3]);
+			hs = 2;
+			msg_rcv = false;
+			sei();
 		}
-		while ( !running ){
-			if( msg_rcv && hs==1 ){
-				UART_getString(hshake);
-				if( packetMatch(hshake, OS_FLAG) ){
-					UART_putChar(hshake[0]);
-					UART_putChar(hshake[1]);
-					UART_putChar(hshake[2]);
-					UART_putChar(10);
-					hs++;
-				}
-				msg_rcv = false;
-			}
-
-			if( msg_rcv && hs==2 ){
-				UART_getString(hshake);
-				if( hshake[0]==OS_FLAG ){
-					UART_putChar(hshake[0]);
-					UART_putChar(hshake[1]);
-					UART_putChar(hshake[2]);
-					UART_putChar(10);
-					running = true;
-					//hs = 0;
-				}
-				msg_rcv = false;
-			}
-			continue;
+		if( msg_rcv && hs==2 ){
+			cli();
+			UART_getString(hshake);
+			UART_putChar(hshake[0]);
+			UART_putChar(hshake[1]);
+			UART_putChar(hshake[2]);
+			UART_putChar(hshake[3]);
+			hs = 3;
+			running = true;
+			msg_rcv = false;
+			sei();
 		}
-		//-------------------------------------------------
-		cli();
+		continue;
+	}
+	//-------------------------------------------------
+	cli();
 
 		// timer used as interrupt trigger
 		setupTimer();
@@ -291,7 +289,7 @@ int main(void){
 		buf[0] = buf[1] = buf[2] = buf[3] = 0;
 		_delay_ms(3000);
 		
-	}	//-------------------------------------------------
+		//-------------------------------------------------
 }
 
 /*=======================================================*/
