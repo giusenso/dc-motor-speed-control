@@ -35,18 +35,18 @@ void setSerialAttributes(int fd){
 
 	tcgetattr(fd, &serial_settings);	/* Get the current attributes of the Serial port */
 
-	cfsetispeed(&serial_settings,B19200); /* Set Read  Speed as 9600                       */
-	cfsetospeed(&serial_settings,B19200); /* Set Write Speed as 9600                       */
+	cfsetispeed(&serial_settings,B19200); /* Set read  speed                      */
+	cfsetospeed(&serial_settings,B19200); /* Set write speed                      */
 
 	serial_settings.c_cflag &= ~PARENB;   /* Disables the Parity*/
 	serial_settings.c_cflag &= ~CSTOPB;   /* CSTOPB = 2 Stop bits, here it is cleared so 1 Stop bit*/
 	serial_settings.c_cflag &= ~CSIZE;	 /* Clears the mask for setting the data size             */
 	serial_settings.c_cflag |=  CS8;      /* Set the data bits = 8                                 */
 
-	serial_settings.c_cflag &= ~CRTSCTS;       /* No Hardware flow Control                         */
+	serial_settings.c_cflag &= ~CRTSCTS;       /* No Hardware flow control                         */
 	serial_settings.c_cflag |= CREAD | CLOCAL; /* Enable receiver,Ignore Modem Control lines       */
 
-	serial_settings.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable XON/XOFF flow control both i/p and o/p */
+	serial_settings.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable flow control both i/p and o/p */
 	serial_settings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);  /* Non Cannonical mode                            */
 
 	serial_settings.c_oflag &= ~OPOST;		/*No Output Processing*/
@@ -58,7 +58,7 @@ void setSerialAttributes(int fd){
 	serial_settings.c_cc[VTIME] = 0;
 
 	tcflush(fd, TCIFLUSH);
-	if((tcsetattr(fd, TCSANOW, &serial_settings)) != 0){
+	if((tcsetattr(fd, TCSAFLUSH, &serial_settings)) != 0){
 		printf("\n ERROR! cannot set serial attributes\n\n");
 		exit(EXIT_FAILURE);
 	}
@@ -72,9 +72,9 @@ void setSerialAttributes(int fd){
 void closeSerialCommunication(int* fd){
 	 
 	packet_t* tmp = (packet_t*)malloc(sizeof(packet_t));
-	tmp->timestamp = CS_FLAG;
-	tmp->speed = CS_FLAG;
-	tmp->direction = CS_FLAG;
+	tmp->timestamp = CF;
+	tmp->speed = CF;
+	tmp->direction = CF;
 	if( !writePacket(*fd, tmp) ) exit(EXIT_FAILURE);
 	free(tmp);
 
@@ -87,63 +87,48 @@ void closeSerialCommunication(int* fd){
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
+bool handshake(int fd, packet_t* packet, bool smooth){
 	struct timespec ts = {0,500*1000000}, ts_rem;
-	printf("# Handshake\n====================================\n\n");
-	
-	packet_t open_packet = { OS_FLAG, OS_FLAG, OS_FLAG };
-	if( !readPacket(fd, packet_rcv) ) return false;
+	packet_t open_packet = { OF, OF+1, OF+2 };
+	printf("# Handshake\n  ===================================\n\n");
+	tcflush(fd, TCIOFLUSH);
+
+	if( !readPacket(fd, packet) ) return false;
 	printf("    PC <<<<< ");
-	printPacketV2(*packet_rcv);
+	printPacketV2(*packet);
 	printf(" <<<<< AVR\n    |\n    check... ");
-	if ( !packetcmp(packet_rcv, &open_packet) ) {
+	if( !packetcmp(packet, &open_packet) ) {
+		printf("error! packet not match with open_packet\n");
+
+		return false;
+	}
+	else printf(" no errors.\n    |\n");
+	nanosleep(&ts, &ts_rem);
+	tcflush(fd, TCIOFLUSH);
+
+	//------------------------------------------------
+	if( smooth ){
+		packet->direction = open_packet.direction = 'l';
+	}
+	if( !writePacket(fd, packet) ) return false;
+	printf("    PC >>>>> ");
+	printPacketV2(*packet);
+	printf(" >>>>> AVR\n");
+
+	if( !readPacket(fd, packet) ) return false;
+	printf("    PC <<<<< ");
+	printPacketV2(*packet);
+	printf(" <<<<< AVR\n    |\n    check... ");
+	if( !packetcmp(packet, &open_packet) ) {
 		printf("error! packet not match with open_packet\n");
 		return false;
 	}
-	else printf(" no errors.\n    |\n");
-	tcflush(fd, TCIOFLUSH);
+	else printf(" no errors.\n");
 	nanosleep(&ts, &ts_rem);
-
-	//------------------------------------------------
-	if( !writePacket(fd,&open_packet) ) return false;
-	printf("    PC >>>>> ");
-	printPacketV2(open_packet);
-	printf(" >>>>> AVR\n");
-
-	if( !readPacket(fd, packet_rcv) ) return false;
-	printf("    PC <<<<< ");
-	printPacketV2(*packet_rcv);
-	printf(" <<<<< AVR\n    |\n    check... ");
-	if ( !packetcmp(packet_rcv, &open_packet) ) {
-		printf("error! packet not match with open_packet\n");
-		return false;
-	}
-	else printf(" no errors.\n    |\n");
 	tcflush(fd, TCIOFLUSH);
-	nanosleep(&ts, &ts_rem);
 
 	//------------------------------------------------
-	//write starting configuration
-	packet_send->timestamp = OS_FLAG;
-	tcflush(fd, TCIOFLUSH);
-	if( !writePacket(fd, packet_send) ) return false;
-	printf("    PC >>>>> ");
-	printPacketV2(*packet_send);
-	printf(" >>>>> AVR\n");
-
-	if( !readPacket(fd, packet_rcv) ) return false;
-	printf("    PC <<<<< ");
-	printPacketV2(*packet_rcv);
-	printf(" <<<<< AVR\n    |\n    check... ");
-	if ( !packetcmp(packet_rcv, packet_send) ) {
-		printf("error! packet not match with packet_send.\n");
-		return false;
-	}
-	else printf(" no errors.\n    |\n");
-	packet_send->timestamp = 1;
-
-	//------------------------------------------------
-	printf("\n====================================\n");
+	printf("\n  ===================================\n# Done.\n");
 	nanosleep(&ts, &ts_rem);
 	tcflush(fd, TCIOFLUSH);
 	return true;
@@ -151,27 +136,24 @@ bool handshake(int fd, packet_t* packet_rcv, packet_t* packet_send){
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-bool writePacket(int fd, packet_t* packet){
-	tcflush(fd, TCOFLUSH);
-	uint8_t buf[4] = { 0,0,0,10 };
-	memcpy(buf, packet, 3);
-	buf[1] += 100;
+bool writePacket(int fd, packet_t* p){
+	uint8_t buf[4] = 
+		{ p->timestamp, p->speed+100, p->direction, 10 };
 
-	if( write(fd, buf, sizeof(buf)) == sizeof(buf) ){
-		//printf("write: [ %d %d %d %d ]\n", buf[0],buf[1],buf[2],buf[3]);
-		return true;
-	}
-	else {
-		printf("Error: bytes written should be %lu\n",sizeof(buf));
+	int ret = write(fd, buf, sizeof(buf));
+	//printf("write: [ %d %d %d %d ]\n", buf[0],buf[1],buf[2],buf[3]);
+	if( ret!= sizeof(buf)){
+		printf("Error: %d bytes written, but should be %lu\n", ret, sizeof(buf));
 		return false;
 	}
+	tcflush(fd, TCOFLUSH);
+	return true;
 	
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool readPacket(int fd, packet_t* packet){
-	tcflush(fd, TCIFLUSH);
 	uint8_t buf[4], byte, i = 0;
 
 	while( read(fd, &byte, 1)>0 ){
@@ -182,8 +164,8 @@ bool readPacket(int fd, packet_t* packet){
 	//printf("read: [ %d %d %d %d ]\n", buf[0],buf[1],buf[2],buf[3]);
 	memcpy(packet, buf, 3);
 	packet->speed -= 100;
+	tcflush(fd, TCIFLUSH);
 	return true;
-
 }
 
 bool packetcmp(packet_t* p1, packet_t* p2){
@@ -271,11 +253,11 @@ bool debug_mode(){
 		\n====================================\n");
 
 	int fd;
-  	uint8_t buf_send[4]={OS_FLAG,15,CWISE,0},
-	  		buf_rcv[4]={0xFF,0xFF,0xFF,0};
+	uint8_t buf_send[4] = { 1,25,CWISE,10 },
+          buf_rcv[4] = { 0xFF,0xFF,0xFF,10 };
 
 	if( openSerialCommunication(&fd) < 0 ){
-		perror("Failed to open serial communication\n");
+		printf("Failed to open serial communication.\n");
 		return false;
 	}	
   	setSerialAttributes(fd);
@@ -291,7 +273,7 @@ bool debug_mode(){
 
 	writePacket(fd, &packet_send);
 	tcflush(fd, TCIOFLUSH);
-	for(int i=0 ; i<10 ; i++ ){
+	for( int i=0 ; i<10 ; i++ ){
 		readPacket(fd, &packet_rcv);
 		printPacket(packet_rcv);
 	}

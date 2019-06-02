@@ -12,14 +12,15 @@
 #define TCCRA_MASK	(1<<WGM11)|(1<<COM1A1)|(1<<COM1B1);	//NON Inverted PWM
 #define	TCCRB_MASK	(1<<WGM13)|(1<<WGM12)|(1<<CS10);	//FAST PWM with NO
 
-#define		CWISE	     		0xAA
-#define		CCWISE      		0xBB
-#define   	OS_FLAG     		'>'		// open serial flag
-#define   	CS_FLAG     		'<'		// close serial flag
-#define   	MIN_SPEED   		100
-#define   	MAX_SPEED			200
 #define   	OCR_TOP_VALUE		39899
 #define   	ONE_PERCENT_STEP  	OCR_TOP_VALUE/100 //~400
+
+#define 	CWISE  		0xAA
+#define 	CCWISE  	0xBB
+#define 	OF  		'>'
+#define 	CF  		'<'
+#define 	MIN_SPEED  	100
+#define 	MAX_SPEED  	200
 
 //---------------------------------------------------------
 void UART_init(void){
@@ -73,10 +74,9 @@ void UART_putString(uint8_t* buf){
 }
 //--------------------------------------------------------
 
+/* Timer 3 ~ digital pin 5 ~ DDRE */
 void PWM_init(void){
-	/* Timer 3 = digital pin 5 = DDRE */
   	//Data direction register
-	//DDRE |= 0xFF;   	//digital pin 5 ON
 	DDRE &= 0x00;   	//digital pin 5	OFF
 
 	//Configure TIMER3
@@ -88,41 +88,39 @@ void PWM_init(void){
 }
 
 void PWM_start(void){
-	DDRE |= 0xFF; 
+	DDRE |= 0xFF;	//digital pin 5 ON
 }
 
 void PWM_stop(void){
-	DDRE &= 0x00;
+	DDRE &= 0x00;	//digital pin 5 OFF
 }
 
 //---------------------------------------------------------
 
 void setupTimer(void){
-	// set the prescaler to 1024
 	TCCR5A = 0x00;
-	TCCR5B = (1 << WGM52) | (1 << CS50) | (1 << CS52);
-	TIMSK5 |= (1 << OCIE5A);  // enable the timer interrupt
-	OCR5A = F_CPU/1024-1;
+	TCCR5B = (1 << WGM52) | (1 << CS50) | (1 << CS52); // set the prescaler to 1024
+	TIMSK5 |= (1 << OCIE5A); // enable timer interrupt
+	OCR5A = F_CPU/1024-1; // 1 per second
 }
 
 //---------------------------------------------------------
 
 void setPacketRate(uint8_t _packet_per_sec){
-	if(!_packet_per_sec){ /*do something*/ }
-	OCR5A = (uint16_t)((F_CPU/1024/_packet_per_sec)-1);
+	if(!_packet_per_sec){ /*do nothing*/ }
+	else OCR5A = (uint16_t)((F_CPU/1024/_packet_per_sec)-1);
 }
 
 //---------------------------------------------------------
 
 void setDirection(uint8_t dir){
-
 	if( dir==CWISE ){
-    	PORTH &= ~(1 << PH6);	//digital pin 9 low
-		PORTH |= (1 << PH5);	//digital pin 8 high
+    	PORTH &= ~(1 << PH6);	// digital pin 9 low
+		PORTH |= (1 << PH5);	// digital pin 8 high
 	}
 	else if( dir==CCWISE ){
-		PORTH &= ~(1 << PH5);	//digital pin 8 low
-		PORTH |= (1 << PH6);	//digital pin 9 high
+		PORTH &= ~(1 << PH5);	// digital pin 8 low
+		PORTH |= (1 << PH6);	// digital pin 9 high
 	}
 }
 
@@ -134,6 +132,7 @@ void setSpeed(uint8_t speed){
 
 /* using linear interpolation */
 void set_speed_smoothly(uint8_t speed){
+	cli();
 	uint16_t delay = 1000;
 	uint8_t num_step = 20;
 	uint8_t delay_per_step = delay/num_step;
@@ -154,16 +153,8 @@ void set_speed_smoothly(uint8_t speed){
 		} 
 	}
 	setSpeed(speed);
+	sei();
 }
-
-//---------------------------------------------------------
-
-bool packetMatch(uint8_t* p, uint8_t c){
-	if( p[0]==c && p[1]-100==c && p[2]==c)return true;
-	else return false;
-}
-
-//---------------------------------------------------------
 
 
 //---------------------------------------------------------
@@ -177,56 +168,37 @@ volatile uint8_t msg_rcv = false;
 int main(void){
 	cli();
 
-	uint8_t buf[4], hs = 0;
+	uint8_t buf[4];
 	uint8_t _packet_rate = 1;
 	uint8_t _timestamp = 1;
-	uint8_t _speed = MIN_SPEED;
+	uint8_t _speed = MIN_SPEED+10;
 	uint8_t _direction = CWISE;
+	bool smooth = false;
 
 	bool running = false;
 	UART_init();
 	_delay_ms(1000);
 	
-	// handshake routine ----------------------------------
-	uint8_t hshake[4] = {OS_FLAG,OS_FLAG+101,OS_FLAG+2,10};
-	if( hs==0 ){
-		
-		UART_putChar(hshake[0]);
-		UART_putChar(hshake[1]);
-		UART_putChar(hshake[2]);
-		UART_putChar(hshake[3]);
-		hs = 1;
-		sei();
-	}
-	while ( !running ){
-		if( msg_rcv && hs==1 ){
-			cli();
-			UART_getString(hshake);
-			UART_putChar(hshake[0]);
-			UART_putChar(hshake[1]);
-			UART_putChar(hshake[2]);
-			UART_putChar(hshake[3]);
-			hs = 2;
-			msg_rcv = false;
-			sei();
-		}
-		if( msg_rcv && hs==2 ){
-			cli();
-			UART_getString(hshake);
-			UART_putChar(hshake[0]);
-			UART_putChar(hshake[1]);
-			UART_putChar(hshake[2]);
-			UART_putChar(hshake[3]);
-			hs = 3;
-			running = true;
-			msg_rcv = false;
-			sei();
-		}
-		continue;
-	}
-	//-------------------------------------------------
-	cli();
+	while(true){	//infinite loop
 
+		// handshake routine ----------------------------------
+		uint8_t hshake[4] = { OF, OF+MIN_SPEED+1, OF+2, 10 };
+		UART_putString(hshake);
+		UART_getString(buf);
+		if ( buf[0]==hshake[0] && buf[1]==hshake[1] ){
+			if( buf[2]=='l' ){
+				smooth = true;
+				running = true;
+			}
+			if( buf[2]==hshake[2] ){
+				smooth = false;
+				running = true;
+			}
+			UART_putString(buf);
+		}
+		
+		//-----------------------------------------------------
+		
 		// timer used as interrupt trigger
 		setupTimer();
 		
@@ -234,15 +206,14 @@ int main(void){
 		PWM_init();
 
 		// set starting parameters
+		_delay_ms(1000);
 		setSpeed(_speed);
 		setDirection(_direction);
-		setPacketRate(1);
+		setPacketRate(_packet_rate);
 		PWM_start();
-
-		sei();
 		
 		// MAIN loop ------------------------------------------
-
+		sei();
 		while( running ){
 
 			if( timer_occurred ){
@@ -256,24 +227,24 @@ int main(void){
 
 			if( msg_rcv ){
 				UART_getString(buf);				
-				if( buf[0]==CS_FLAG ){
+				if( buf[0] == CF ){
 					cli();
 					running = false;
 				}		
 				else{
-					if( _packet_rate!=buf[0] ){
+					if( _packet_rate != buf[0] ){
 						_packet_rate = buf[0];
 						setPacketRate(_packet_rate);
 					}
-					if( _speed!=buf[1]){
+					if( _speed != buf[1]){
 						_speed = buf[1];
 						setSpeed(_speed);
 					}
 					if( _direction != buf[2] ){
 						_direction = buf[2];
-						set_speed_smoothly(MIN_SPEED);
+						if( smooth ) set_speed_smoothly(MIN_SPEED);
 						setDirection(_direction);
-						set_speed_smoothly(_speed);
+						if( smooth ) set_speed_smoothly(_speed);
 					}
 				}
 				msg_rcv = false;   
@@ -283,13 +254,13 @@ int main(void){
 		PWM_stop();
 		_timestamp = 1;
 		_packet_rate = 1;
-		setPacketRate(_packet_rate);
 		_speed = MIN_SPEED;
+		setPacketRate(_packet_rate);
 		setSpeed(_speed);
 		buf[0] = buf[1] = buf[2] = buf[3] = 0;
-		_delay_ms(3000);
-		
-		//-------------------------------------------------
+
+	}
+	//-------------------------------------------------
 }
 
 /*=======================================================*/
