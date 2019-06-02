@@ -78,5 +78,11 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 	- main testing: some bugs, but works
 
 ### 23.05.19
-	-fix bug #2
-	-linear interpolation for smooth speed changes
+	- fix bug #2
+	- linear interpolation for smooth speed changes
+
+### 01-02.06.19
+	- testing different handshake protocols
+	- choose the definitive handshake
+	- add option flag -s to enable linear interpolation on avr
+	- add option flag -f to force avr re-upload
