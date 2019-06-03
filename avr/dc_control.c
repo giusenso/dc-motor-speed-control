@@ -26,6 +26,7 @@
 #define 	MIN_SPEED  	100		// dc motor minimum speed
 #define 	MAX_SPEED  	200		// dc motor miximum speed
 
+
 /*=======================================================*/
 /*::::: functions :::::::::::::::::::::::::::::::::::::::*/
 /*=======================================================*/
@@ -80,7 +81,6 @@ uint8_t UART_getString(uint8_t* buf){
 		}
 	}
 }
-
 //---------------------------------------------------------
 void UART_putChar(uint8_t c){
 	// wait for transmission completed, looping on status bit
@@ -90,7 +90,6 @@ void UART_putChar(uint8_t c){
 	UDR0 = c;
 }
 //---------------------------------------------------------
-
 void UART_putString(uint8_t* buf){
 	while(*buf){
 		UART_putChar(*buf);
@@ -98,7 +97,6 @@ void UART_putString(uint8_t* buf){
 	}
 }
 //---------------------------------------------------------
-
 /* Timer 3 ~ digital pin 5 ~ DDRE */
 void PWM_init(void){
   	//Data direction register
@@ -119,25 +117,19 @@ void PWM_start(void){
 void PWM_stop(void){
 	DDRE &= 0x00;	//digital pin 5 OFF
 }
-
 //---------------------------------------------------------
-
 void setupTimer(void){
 	TCCR5A = 0x00;
 	TCCR5B = (1 << WGM52) | (1 << CS50) | (1 << CS52); // set the prescaler to 1024
 	TIMSK5 |= (1 << OCIE5A); // enable timer interrupt
 	OCR5A = F_CPU/1024-1; // 1 per second
 }
-
 //---------------------------------------------------------
-
 void setPacketRate(uint8_t _packet_per_sec){
 	if(!_packet_per_sec){ /*do nothing*/ }
 	else OCR5A = (uint16_t)((F_CPU/1024/_packet_per_sec)-1);
 }
-
 //---------------------------------------------------------
-
 void setDirection(uint8_t dir){
 	if( dir==CWISE ){
     	PORTH &= ~(1 << PH6);	// digital pin 9 low
@@ -148,9 +140,7 @@ void setDirection(uint8_t dir){
 		PORTH |= (1 << PH6);	// digital pin 9 high
 	}
 }
-
 //---------------------------------------------------------
-
 void setSpeed(uint8_t speed){
 	OCR3A = (speed-MIN_SPEED)*ONE_PERCENT_STEP;
 }
@@ -158,7 +148,7 @@ void setSpeed(uint8_t speed){
 /* using linear interpolation */
 void set_speed_smoothly(uint8_t speed){
 	cli();
-	uint16_t delay = 1000;
+	uint16_t delay = 1500;
 	uint8_t num_step = 20;
 	uint8_t delay_per_step = delay/num_step;
 	uint16_t new_ocr = (speed-MIN_SPEED)*ONE_PERCENT_STEP;
@@ -198,7 +188,7 @@ int main(void){
 	bool running = false;
 
 	UART_init();
-	_delay_ms(3000);
+	_delay_ms(1500);
 	
 	while(true){	//infinite loop
 
@@ -207,16 +197,16 @@ int main(void){
 		UART_putString(hshake);
 		UART_getString(buf);
 		if ( buf[0]==hshake[0] && buf[1]==hshake[1] ){
-			if( buf[2]=='l' ){
-				smooth = true;
-				running = true;
-				hshake[2] = 'l';
-			}
 			if( buf[2]==hshake[2] ){
 				smooth = false;
 				running = true;
 			}
-			_delay_ms(600);
+			else if( buf[2]=='l' ){
+				smooth = true;
+				running = true;
+				hshake[2] = 'l';
+			}
+			_delay_ms(800);
 			UART_putString(hshake);
 		}
 		else break;
@@ -270,9 +260,9 @@ int main(void){
 					}
 					if( _direction != buf[2] ){
 						_direction = buf[2];
-						if( smooth ) set_speed_smoothly(MIN_SPEED);
+						if(smooth) set_speed_smoothly(MIN_SPEED+5);
 						setDirection(_direction);
-						if( smooth ) set_speed_smoothly(_speed);
+						if(smooth) set_speed_smoothly(_speed);
 					}
 				}
 				msg_rcv = false;   
