@@ -1,36 +1,21 @@
-# DC Motor speed control using atmega2560 and H-bridge
+# DC Motor Speed Controller
 
 ## Table of contents
-* [Project description](#the-project)
-* [Hardware](#hardware)
-* [Technologies](#technologies)
-* [Features](#features)
-* [Development](#development)
+* [Project description](#Project-description)
+* [Hardware](#Hardware)
+* [Technologies](#Technologies)
+* [How to run](#How-to-run)
+* [Development](#Development)
 
-## The project
-The purpose of this project is to control a DC motor in open loop from a PC. A microcontroller generate a pwm to move the motor. Motor's speed and direction is acquired by serial. PC side there is an easy graphic unit interface to set the parameters.
+## Project description
+The purpose of this project is to control DC motors in open loop, in order to set speed and direction in real time.
+To achieve this I used one microcontroller and one H-bridge. PC and MCU communicates writing each other custom packets.
+Basically, the idea is this:
+* PC to MCU serial communication to set the motor parameters.
+* MCU to PC serial communication to check the motor status.
 
-
-## Hardware
-* AVR atmega2560
-* Dc motor (6V)
-* Battery pack (6V, 2850mAh)
-* L298N H-bridge
-
-## Technologies
-
-* OS: Ubuntu 16.04
-* Language: C
-* PC compiler: gcc (version 5.4.0)
-* MCU compiler: avr-gcc (version 4.9.2)
-* GUI lib: ncurses.h
-
-## Features
-* PC to MCU serial communication to set the motor parameters
-* MCU to PC serial communication to check the motor status
 
 ### MCU side
-
 * PWM generation
 * Periodically send status-packets with a timer based ISR
 * Receive setting-packets with UART based ISR
@@ -39,6 +24,75 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 * Open, set and close serial communication using unix API
 * Multithreading (1 sender thread, 1 listener thread)
 * Graphic Unit Interface with ncurses
+* Option flags handling
+
+(Other info can be found in the repo's wiki.)
+
+## Hardware
+* AVR atmega2560
+* DC motor
+* Battery pack (6V, 2850mAh)
+* L298N H-bridge
+
+## Technologies
+* OS: Ubuntu 16.04
+* Language: C
+* PC compiler: gcc (version 5.4.0)
+* MCU compiler: avr-gcc (version 4.9.2)
+* GUI lib: ncurses.h
+
+
+## How to run
+
+### Installation
+Firts of all, make sure you have installed ncurses library. If not, type:
+```bash
+sudo apt-get install libncurses5-dev libncursesw5-dev
+```
+
+To upload AVR code in your microcontroller you need avr-gcc:
+```bash
+sudo apt-get install gcc-avr binutils-avr gdb-avr avr-libc avrdude
+```
+
+AVR code can be compiled and uploaded typing :
+```bash
+cd avr
+make
+make dc_control.hex
+sudo addgroup <your username> dialout
+cd ..
+```
+
+Pc-side code can be found in "serial" directory. Run Makefile in order to compile and create the executable:
+```bash
+cd serial
+make
+```
+
+After that, you are ready to run the program.
+
+### Usage
+Pc-side code can be found in "serial" directory. Run Makefile in order to compile and create the executable:
+```bash
+./main
+```
+Main can be launched with different optional flags:
+
+```bash
+./main -l
+```
+Enable linear interpolation on avr. With this flag enabled motor direction change smoothly.
+
+```bash
+./main -f
+```
+Force avr re-upload/restart.
+
+```bash
+./main -d
+```
+Debuf mode (deprecated). Used for communication testing, GUI disabled.
 
 
 ## Development
@@ -89,3 +143,4 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 	
 ### 03.06.19
 	- cleaning: remove useless stuff
+	- fixing linear interpolation
