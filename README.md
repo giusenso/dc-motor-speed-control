@@ -86,3 +86,6 @@ The purpose of this project is to control a DC motor in open loop from a PC. A m
 	- choose the definitive handshake
 	- add option flag -s to enable linear interpolation on avr
 	- add option flag -f to force avr re-upload
+	
+### 03.06.19
+	- cleaning: remove useless stuff
