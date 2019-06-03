@@ -91,7 +91,9 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 	struct timespec ts = {0,500*1000000}, ts_rem;
 	packet_t open_packet = { OF, OF+1, OF+2 };
 	printf("# Handshake\n  ===================================\n\n");
+	nanosleep(&ts, &ts_rem);
 	tcflush(fd, TCIOFLUSH);
+	//------------------------------------------------
 
 	if( !readPacket(fd, packet) ) return false;
 	printf("    PC <<<<< ");
@@ -105,8 +107,8 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 	else printf(" no errors.\n    |\n");
 	nanosleep(&ts, &ts_rem);
 	tcflush(fd, TCIOFLUSH);
-
 	//------------------------------------------------
+
 	if( smooth ){
 		packet->direction = open_packet.direction = 'l';
 	}
@@ -114,6 +116,7 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 	printf("    PC >>>>> ");
 	printPacketV2(*packet);
 	printf(" >>>>> AVR\n");
+	//------------------------------------------------
 
 	if( !readPacket(fd, packet) ) return false;
 	printf("    PC <<<<< ");
@@ -124,10 +127,8 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 		return false;
 	}
 	else printf(" no errors.\n");
-	nanosleep(&ts, &ts_rem);
-	tcflush(fd, TCIOFLUSH);
-
 	//------------------------------------------------
+
 	printf("\n  ===================================\n# Done.\n");
 	nanosleep(&ts, &ts_rem);
 	tcflush(fd, TCIOFLUSH);
@@ -146,7 +147,6 @@ bool writePacket(int fd, packet_t* p){
 		printf("Error: %d bytes written, but should be %lu\n", ret, sizeof(buf));
 		return false;
 	}
-	tcflush(fd, TCOFLUSH);
 	return true;
 	
 }
@@ -164,9 +164,10 @@ bool readPacket(int fd, packet_t* packet){
 	//printf("read: [ %d %d %d %d ]\n", buf[0],buf[1],buf[2],buf[3]);
 	memcpy(packet, buf, 3);
 	packet->speed -= 100;
-	tcflush(fd, TCIFLUSH);
 	return true;
 }
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool packetcmp(packet_t* p1, packet_t* p2){
 	if( p1->timestamp != p2->timestamp ) return false;
