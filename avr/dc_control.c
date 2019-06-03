@@ -4,30 +4,55 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "avr_common/uart.h"
 
-#define BAUD 19200
+/*=======================================================*/
+/*:::::: defines ::::::::::::::::::::::::::::::::::::::::*/
+/*=======================================================*/
+
+#define BAUD 19600
 #define MYUBRR (F_CPU/16/BAUD-1)
 
 #define TCCRA_MASK	(1<<WGM11)|(1<<COM1A1)|(1<<COM1B1);	//NON Inverted PWM
 #define	TCCRB_MASK	(1<<WGM13)|(1<<WGM12)|(1<<CS10);	//FAST PWM with NO
 
-#define   	OCR_TOP_VALUE		39899
-#define   	ONE_PERCENT_STEP  	OCR_TOP_VALUE/100 //~400
+#define   	OCR_TOP_VALUE		39998				// top timer value
+#define   	ONE_PERCENT_STEP  	OCR_TOP_VALUE/100 	// ~400
 
-#define 	CWISE  		0xAA
-#define 	CCWISE  	0xBB
-#define 	OF  		'>'
-#define 	CF  		'<'
-#define 	MIN_SPEED  	100
-#define 	MAX_SPEED  	200
+#define 	CWISE  		0xAA	// clockwise
+#define 	CCWISE  	0xBB	// counterclockwise
+#define 	OF  		'>'		// open serial flag
+#define 	CF  		'<'		// close serial flag
+
+#define 	MIN_SPEED  	100		// dc motor minimum speed
+#define 	MAX_SPEED  	200		// dc motor miximum speed
+
+/*=======================================================*/
+/*::::: functions :::::::::::::::::::::::::::::::::::::::*/
+/*=======================================================*/
+
+void UART_init(void);
+uint8_t UART_getChar(void);
+uint8_t UART_getString(uint8_t* buf);
+void UART_putChar(uint8_t c);
+void UART_putString(uint8_t* buf);
+
+void PWM_init(void);
+void PWM_start(void);
+void PWM_stop(void);
+void setupTimer(void);
+
+void setPacketRate(uint8_t _packet_per_sec);
+void setDirection(uint8_t dir);
+void setSpeed(uint8_t speed);
+void set_speed_smoothly(uint8_t speed);
 
 //---------------------------------------------------------
 void UART_init(void){
-	UBRR0H = (uint8_t)(MYUBRR>>8);
-	UBRR0L = (uint8_t)MYUBRR;
-	UCSR0C = (1<<UCSZ01) | (1<<UCSZ00);               /* 8-bit data */ 
-	UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */  
+  UBRR0H = (uint8_t)(MYUBRR>>8);
+  UBRR0L = (uint8_t)MYUBRR;
+  UCSR0C = (1<<UCSZ01) | (1<<UCSZ00); 				/* 8-bit data */ 
+  UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */  
+
 }
 //---------------------------------------------------------
 uint8_t UART_getChar(void){
@@ -72,7 +97,7 @@ void UART_putString(uint8_t* buf){
 		++buf;
 	}
 }
-//--------------------------------------------------------
+//---------------------------------------------------------
 
 /* Timer 3 ~ digital pin 5 ~ DDRE */
 void PWM_init(void){
@@ -155,29 +180,25 @@ void set_speed_smoothly(uint8_t speed){
 	setSpeed(speed);
 	sei();
 }
-
-
 //---------------------------------------------------------
+
 /*  global variables  */
 volatile uint8_t timer_occurred = false;
 volatile uint8_t msg_rcv = false;
 
 /*=======================================================*/
 /*::::: M A I N :::::::::::::::::::::::::::::::::::::::::*/
-
+/*=======================================================*/
 int main(void){
+
 	cli();
 
 	uint8_t buf[4];
-	uint8_t _packet_rate = 1;
-	uint8_t _timestamp = 1;
-	uint8_t _speed = MIN_SPEED+10;
-	uint8_t _direction = CWISE;
 	bool smooth = false;
-
 	bool running = false;
+
 	UART_init();
-	_delay_ms(1000);
+	_delay_ms(3000);
 	
 	while(true){	//infinite loop
 
@@ -189,13 +210,16 @@ int main(void){
 			if( buf[2]=='l' ){
 				smooth = true;
 				running = true;
+				hshake[2] = 'l';
 			}
 			if( buf[2]==hshake[2] ){
 				smooth = false;
 				running = true;
 			}
-			UART_putString(buf);
+			_delay_ms(600);
+			UART_putString(hshake);
 		}
+		else break;
 		
 		//-----------------------------------------------------
 		
@@ -206,7 +230,11 @@ int main(void){
 		PWM_init();
 
 		// set starting parameters
-		_delay_ms(1000);
+		uint8_t _timestamp = 1;
+		uint8_t _speed = MIN_SPEED;
+		uint8_t _direction = CWISE;
+		uint8_t _packet_rate = 1;
+		//_delay_ms(1000);
 		setSpeed(_speed);
 		setDirection(_direction);
 		setPacketRate(_packet_rate);
@@ -258,7 +286,6 @@ int main(void){
 		setPacketRate(_packet_rate);
 		setSpeed(_speed);
 		buf[0] = buf[1] = buf[2] = buf[3] = 0;
-
 	}
 	//-------------------------------------------------
 }
