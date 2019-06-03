@@ -8,12 +8,11 @@
 * [Development](#Development)
 
 ## Project description
-The purpose of this project is to control DC motors in open loop, in order to set speed and direction in real time.
-To achieve this I used one microcontroller and one H-bridge. PC and MCU communicates writing each other custom packets.
+The main purpose of this project is to control DC motors in open loop, in order to set speed and direction in real time.
+One MCU and one H-bridge are used to achieve this. PC and MCU communicates writing each other custom packets.
 Basically, the idea is this:
 * PC to MCU serial communication to set the motor parameters.
 * MCU to PC serial communication to check the motor status.
-
 
 ### MCU side
 * PWM generation
