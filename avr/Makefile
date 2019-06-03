@@ -25,14 +25,14 @@
 # to be uploaded on the avr
 # you can add multiple files, they will be all generated
 
-BINS=dc_control.elf 
+BINS = dc_control.elf
 
 # put here the additional .o files you want to generate
 # one .c file for each .o should be present
-OBJS=
+OBJS =
 
 # put here the additional header files needed for compilation
-HEADERS=
+HEADERS =
 
 # the file below contains the actual rules
 
