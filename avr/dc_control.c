@@ -51,8 +51,8 @@ void set_speed_smoothly(uint8_t speed);
 void UART_init(void){
   UBRR0H = (uint8_t)(MYUBRR>>8);
   UBRR0L = (uint8_t)MYUBRR;
-  UCSR0C = (1<<UCSZ01) | (1<<UCSZ00); 				/* 8-bit data */ 
-  UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */  
+  UCSR0C = (1<<UCSZ01) | (1<<UCSZ00); 				/* 8-bit data */
+  UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);   /* Enable RX and TX */
 
 }
 //---------------------------------------------------------
@@ -165,7 +165,7 @@ void set_speed_smoothly(uint8_t speed){
 		for(uint8_t i=0 ; i<num_step ; i++){
 			OCR3A -= step;
 			_delay_ms(delay_per_step);
-		} 
+		}
 	}
 	setSpeed(speed);
 	sei();
@@ -189,7 +189,7 @@ int main(void){
 
 	UART_init();
 	_delay_ms(1500);
-	
+
 	while(true){	//infinite loop
 
 		// handshake routine ----------------------------------
@@ -197,6 +197,7 @@ int main(void){
 		UART_putString(hshake);
 		UART_getString(buf);
 		if ( buf[0]==hshake[0] && buf[1]==hshake[1] ){
+            uint8_t tmp[4] = { OF, OF+MIN_SPEED+1, OF+2, 10 };
 			if( buf[2]==hshake[2] ){
 				smooth = false;
 				running = true;
@@ -204,19 +205,18 @@ int main(void){
 			else if( buf[2]=='l' ){
 				smooth = true;
 				running = true;
-				hshake[2] = 'l';
+				tmp[2] = 'l';
 			}
-			_delay_ms(800);
-			UART_putString(hshake);
+			_delay_ms(100);
+			UART_putString(tmp);
 		}
 		else break;
-		
+
 		//-----------------------------------------------------
-		
 		// timer used as interrupt trigger
 		setupTimer();
-		
-		// pwm to control motor speed 
+
+		// pwm to control motor speed
 		PWM_init();
 
 		// set starting parameters
@@ -229,7 +229,7 @@ int main(void){
 		setDirection(_direction);
 		setPacketRate(_packet_rate);
 		PWM_start();
-		
+
 		// MAIN loop ------------------------------------------
 		sei();
 		while( running ){
@@ -241,14 +241,14 @@ int main(void){
 				UART_putChar(10);
 				_timestamp = _timestamp<255?_timestamp+1:1;
 				timer_occurred = false;
-			}     
+			}
 
 			if( msg_rcv ){
-				UART_getString(buf);				
+				UART_getString(buf);
 				if( buf[0] == CF ){
 					cli();
 					running = false;
-				}		
+				}
 				else{
 					if( _packet_rate != buf[0] ){
 						_packet_rate = buf[0];
@@ -265,7 +265,7 @@ int main(void){
 						if(smooth) set_speed_smoothly(_speed);
 					}
 				}
-				msg_rcv = false;   
+				msg_rcv = false;
 			}
 		}
 
@@ -276,6 +276,7 @@ int main(void){
 		setPacketRate(_packet_rate);
 		setSpeed(_speed);
 		buf[0] = buf[1] = buf[2] = buf[3] = 0;
+        _delay_ms(1000);
 	}
 	//-------------------------------------------------
 }

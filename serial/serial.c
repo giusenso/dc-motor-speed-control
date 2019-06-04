@@ -50,7 +50,7 @@ void setSerialAttributes(int fd){
 	serial_settings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);  /* Non Cannonical mode                            */
 
 	serial_settings.c_oflag &= ~OPOST;		/*No Output Processing*/
-	
+
 	/* read at least this bytes */
 	serial_settings.c_cc[VMIN] = 1;
 
@@ -70,7 +70,7 @@ void setSerialAttributes(int fd){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void closeSerialCommunication(int* fd){
-	 
+
 	packet_t* tmp = (packet_t*)malloc(sizeof(packet_t));
 	tmp->timestamp = CF;
 	tmp->speed = CF;
@@ -105,8 +105,8 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 		return false;
 	}
 	else printf(" no errors.\n    |\n");
-	nanosleep(&ts, &ts_rem);
 	tcflush(fd, TCIOFLUSH);
+	nanosleep(&ts, &ts_rem);
 	//------------------------------------------------
 
 	if( smooth ){
@@ -116,6 +116,8 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 	printf("    PC >>>>> ");
 	printPacketV2(*packet);
 	printf(" >>>>> AVR\n");
+	tcflush(fd, TCIOFLUSH);
+	nanosleep(&ts, &ts_rem);
 	//------------------------------------------------
 
 	if( !readPacket(fd, packet) ) return false;
@@ -138,7 +140,7 @@ bool handshake(int fd, packet_t* packet, bool smooth){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 bool writePacket(int fd, packet_t* p){
-	uint8_t buf[4] = 
+	uint8_t buf[4] =
 		{ p->timestamp, p->speed+100, p->direction, 10 };
 
 	int ret = write(fd, buf, sizeof(buf));
@@ -148,7 +150,7 @@ bool writePacket(int fd, packet_t* p){
 		return false;
 	}
 	return true;
-	
+
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -180,7 +182,7 @@ bool packetcmp(packet_t* p1, packet_t* p2){
 
 void printPacket(packet_t packet){
 	char* str_dir = "???";
-	if( packet.direction==CWISE ) str_dir = "CW"; 
+	if( packet.direction==CWISE ) str_dir = "CW";
 	else if( packet.direction==CCWISE ) str_dir = "CCW";
 	printf("\n  [ ts: %d | speed: %d%% | dir: %s ]\n",
           packet.timestamp, packet.speed, str_dir);
@@ -244,7 +246,7 @@ bool increaseRefreshRate(packet_t* packet){
  * - handshake
  * - set dc motor parameters
  * - read every 1 second the stats
- * 
+ *
  * @return true if there is no error
  * @return false in case of error
  */
@@ -260,7 +262,7 @@ bool debug_mode(){
 	if( openSerialCommunication(&fd) < 0 ){
 		printf("Failed to open serial communication.\n");
 		return false;
-	}	
+	}
   	setSerialAttributes(fd);
 
 	packet_t packet_send, packet_rcv;
