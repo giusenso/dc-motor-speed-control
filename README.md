@@ -1,6 +1,6 @@
 # DC Motor Speed Controller
 
-<img src="dc-motor-speed-control/serial/img/user_interface.PNG" width="600">
+<img src="serial/img/user_interface.PNG" width="400" align="center">
 
 ## Table of contents
 * [Project description](#Project-description)
