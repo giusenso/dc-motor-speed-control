@@ -1,5 +1,7 @@
 # DC Motor Speed Controller
 
+<img src="dc-motor-speed-control/serial/img/user_interface.PNG" width="600">
+
 ## Table of contents
 * [Project description](#Project-description)
 * [Hardware](#Hardware)
@@ -24,8 +26,6 @@ Basically, the idea is this:
 * Multithreading (1 sender thread, 1 listener thread)
 * Graphic Unit Interface with ncurses
 * Option flags handling
-
-(Other info can be found in the repo's wiki.)
 
 ## Hardware
 * AVR atmega2560
